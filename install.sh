@@ -94,18 +94,15 @@ fi
 # 5. Default Applications & Dependencies
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
-    grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
+    git grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
     # Core dependencies for new features (lightweight alternatives)
     btop networkmanager network-manager-applet pavucontrol kio # kio is a Dolphin dependency
 )
+# Use the all-in-one theme package provided by the user
 aur_packages=(
     wlogout
-    # Dracula Theme packages from the AUR
-    dracula-gtk-theme
-    **kvantum-theme-dracula** # <-- FINAL CORRECTED PACKAGE NAME
-    dracula-icons-git
-    dracula-cursors-git
+    full-dracula-theme-git
 )
 
 # Terminal
@@ -631,9 +628,9 @@ EOF
 # --- Theming Setup ---
 echo "Applying GTK and QT themes..."
 GTK_THEME="Dracula"
-KVANTUM_THEME="Dracula"
-ICON_THEME="Dracula"
-CURSOR_THEME="Dracula"
+KVANTUM_THEME="Dracula" # This name should be provided by the new package
+ICON_THEME="Dracula"    # This name should be provided by the new package
+CURSOR_THEME="Dracula"  # This name should be provided by the new package
 FONT="Noto Sans 11"
 
 # GTK3 settings
@@ -665,7 +662,7 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 theme=$KVANTUM_THEME
 EOF
 
-# --- START OF NEW SECTION: KDE/Qt Application-Specific Theming ---
+# --- KDE/Qt Application-Specific Theming ---
 echo "Applying Dracula theme to Konsole and Kate for a cohesive look..."
 
 # Create directories for custom themes and profiles
@@ -743,7 +740,6 @@ cat <<EOF > ~/.config/katerc
 [General]
 Color Theme=Dracula
 EOF
-# --- END OF NEW SECTION ---
 
 
 # --- Autostart Configuration ---
