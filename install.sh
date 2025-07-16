@@ -629,27 +629,27 @@ if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
     ### Create the single, all-in-one systemd service for autostart ###
-    # This new service starts Hyprland directly and wraps it in a proper PAM
-    # login session, which provides all the necessary environment, permissions,
-    # and logind integration. This eliminates all intermediate steps.
     echo "Creating final systemd service for direct autostart..."
     AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
     
     cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
 [Unit]
 Description=Directly starts Hyprland for user %i
-After=systemd-user-sessions.service plymouth-quit.service
+After=systemd-user-sessions.service
 
 [Service]
 User=%i
 WorkingDirectory=/home/%i
-# This is the magic bullet. It creates a full login session,
-# providing Hyprland with graphics, input, and environment.
+# This directive creates a full login session, providing Hyprland
+# with graphics, input, and basic environment variables.
 PAMName=login
-ExecStart=/usr/bin/Hyprland
+# The final fix: Explicitly pass the config file to Hyprland.
+# This removes any ambiguity and prevents it from crashing if it
+# cannot find its config in the minimal service environment.
+ExecStart=/usr/bin/Hyprland --config /home/%i/.config/hypr/hyprland.conf
+Restart=always
 StandardOutput=journal
 StandardError=journal
-Restart=always
 
 [Install]
 WantedBy=multi-user.target
@@ -672,7 +672,7 @@ EOF
 
     echo
     echo "Autostart configured with the final, direct PAM-based systemd method."
-    echo "This is the most reliable approach."
+    echo "This should be the final fix."
 fi
 
 # --- Final Instructions ---
