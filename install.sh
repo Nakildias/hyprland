@@ -262,11 +262,10 @@ ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
+# Simplified for a more reliable Qt theme experience
 env = XCURSOR_SIZE,24
 env = GTK_THEME,Dracula
-env = QT_QPA_PLATFORMTHEME,kde
-# QT_STYLE_OVERRIDE is removed to prevent conflicts with the KDE platform theme
-env = XDG_CURRENT_DESKTOP,KDE
+env = QT_STYLE_OVERRIDE,kvantum
 
 # --- Input Devices ---
 input {
