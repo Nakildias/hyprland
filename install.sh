@@ -665,7 +665,7 @@ PartOf=graphical-session.target
 After=graphical-session-pre.target
 
 [Service]
-ExecStart=/bin/bash -c "dbus-update-activation-environment --systemd --all && exec Hyprland"
+ExecStart=/bin/bash -c "sleep 1 && dbus-update-activation-environment --systemd --all && exec Hyprland"
 Restart=always
 RestartSec=1
 
