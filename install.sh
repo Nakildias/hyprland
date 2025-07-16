@@ -1,285 +1,183 @@
 #!/bin/bash
-#
-# Complete Hyprland Installation Script
-# This version incorporates the Dracula theming system and lightweight utilities.
 
-# Abort on any error
-set -e
+# Hyprland Automated Setup Script
+# This script helps configure Hyprland, Waybar, and Rofi with user-defined options.
 
-# --- Helper Functions for Menus ---
-function print_menu() {
-    local title="$1"
-    local -n options_ref="$2" # Use a name reference for the array
-    echo "--------------------------------------"
-    echo " $title"
-    echo "--------------------------------------"
-    for i in "${!options_ref[@]}"; do
-        echo " $((i+1))) ${options_ref[$i]##*/}" # Show only the filename
-    done
-    echo "--------------------------------------"
+# --- Variables ---
+HYPR_CONFIG_DIR="$HOME/.config/hypr"
+WAYBAR_CONFIG_DIR="$HOME/.config/waybar"
+ROFI_CONFIG_DIR="$HOME/.config/rofi"
+
+ACCENT_COLOR=""
+GAP_SIZE=""
+WAYBAR_POSITION=""
+MONITOR_RESOLUTION=""
+MONITOR_REFRESH_RATE=""
+ENABLE_BATTERY="false"
+
+# --- Functions ---
+
+# Function to display a message box (instead of alert)
+show_message() {
+    echo "-----------------------------------------------------"
+    echo "$1"
+    echo "-----------------------------------------------------"
 }
 
-function get_choice() {
-    local choice
-    read -p "Enter your choice [1-$(($#))]: " choice
-    # Validate that choice is a number and within range
-    while ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt $(($#)) ]; do
-        read -p "Invalid choice. Please enter a number between 1 and $(($#)): " choice
-    done
-    echo $choice
-}
-
-# --- Introduction ---
-echo "------------------------------------------------------"
-echo " Hyprland Arch Linux Installation Script"
-echo "------------------------------------------------------"
-echo
-echo "This script will guide you through installing and configuring a personalized Hyprland desktop."
-echo
-
-# --- User Choices ---
-
-# 1. Gap Profile
-gaps_in=5
-gaps_out=10
-gap_options=("Small (gaps_in: 3, gaps_out: 8)" "Medium (gaps_in: 5, gaps_out: 10) (Default)" "Large (gaps_in: 8, gaps_out: 15)")
-print_menu "Select a Gap Profile" gap_options
-gap_choice=$(get_choice "${gap_options[@]}")
-case $gap_choice in
-    1) gaps_in=3; gaps_out=8 ;;
-    2) gaps_in=5; gaps_out=10 ;;
-    3) gaps_in=8; gaps_out=15 ;;
-esac
-
-# 2. Waybar Position
-waybar_position="top"
-waybar_pos_options=("Top (Default)" "Bottom")
-print_menu "Select Waybar Position" waybar_pos_options
-waybar_pos_choice=$(get_choice "${waybar_pos_options[@]}")
-if [ "$waybar_pos_choice" -eq 2 ]; then
-    waybar_position="bottom"
-fi
-
-# 3. Waybar Clock Format
-clock_format=" {:%H:%M  %d/%m}"
-clock_options=("Time and Date (Default)" "Time Only")
-print_menu "Select Waybar Clock Format" clock_options
-clock_choice=$(get_choice "${clock_options[@]}")
-if [ "$clock_choice" -eq 2 ]; then
-    clock_format=" {:%H:%M}"
-fi
-
-# 4. Waybar Battery Module
-waybar_battery_module=""
-waybar_battery_config=""
-read -p "Are you using a laptop? Would you like to enable the battery module in Waybar? (y/N): " battery_confirm
-if [[ "$battery_confirm" == [yY] ]]; then
-    waybar_battery_module='"battery",'
-    waybar_battery_config=$(cat <<'EBC'
-    "battery": {
-        "states": {
-            "warning": 30,
-            "critical": 15
-        },
-        "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
-        "format-alt": "{time} {icon}",
-        "format-icons": ["", "", "", "", ""]
-    },
-EBC
-)
-fi
-
-# 5. Default Applications & Dependencies
-pacman_packages=(
-    hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland kvantum swaylock swww archlinux-wallpaper
-    git grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
-    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
-    btop networkmanager network-manager-applet pavucontrol kio
-)
-aur_packages=(
-    wlogout
-    full-dracula-theme-git
-)
-
-# Terminal
-terminal_options=("Konsole" "Alacritty" "Kitty")
-print_menu "Choose your default Terminal" terminal_options
-terminal_choice=$(get_choice "${terminal_options[@]}")
-case $terminal_choice in
-    1) TERM_CMD="konsole"; pacman_packages+=("konsole") ;;
-    2) TERM_CMD="alacritty"; pacman_packages+=("alacritty") ;;
-    3) TERM_CMD="kitty"; pacman_packages+=("kitty") ;;
-esac
-
-# IDE
-ide_options=("Kate (Default)" "Visual Studio Code" "Neovim")
-print_menu "Choose your default IDE/Text Editor" ide_options
-ide_choice=$(get_choice "${ide_options[@]}")
-case $ide_choice in
-    1) IDE_CMD="kate"; pacman_packages+=("kate") ;;
-    2) IDE_CMD="code"; aur_packages+=("visual-studio-code-bin") ;;
-    3) IDE_CMD="nvim"; pacman_packages+=("neovim") ;;
-esac
-
-# File Manager
-fm_options=("Dolphin (Default)" "Nautilus" "Thunar")
-print_menu "Choose your default File Manager" fm_options
-fm_choice=$(get_choice "${fm_options[@]}")
-case $fm_choice in
-    1) FM_CMD="dolphin"; pacman_packages+=("dolphin") ;;
-    2) FM_CMD="nautilus"; pacman_packages+=("nautilus") ;;
-    3) FM_CMD="thunar"; pacman_packages+=("thunar") ;;
-esac
-
-# --- Theme Configuration (Dracula) ---
-echo
-echo "🎨 Applying the Dracula theme for a flat, modern aesthetic."
-ACCENT_COLOR="#bd93f9" # Dracula Purple
-HYPR_ACCENT_COLOR="bd93f9"
-HYPR_GRADIENT_COLOR="8be9fd" # Dracula Cyan
-
-# --- Wallpaper Selection ---
-WALLPAPER_PATH=""
-wallpaper_dir_user="$HOME/Pictures/wallpapers"
-wallpaper_dir_system="/usr/share/backgrounds"
-wallpaper_options=()
-
-mkdir -p "$wallpaper_dir_user"
-
-if [ -d "$wallpaper_dir_user" ]; then
-    while IFS= read -r -d $'\0' file; do
-        wallpaper_options+=("$file")
-    done < <(find "$wallpaper_dir_user" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \) -print0)
-fi
-if [ -d "$wallpaper_dir_system" ]; then
-      while IFS= read -r -d $'\0' file; do
-        wallpaper_options+=("$file")
-    done < <(find "$wallpaper_dir_system" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \) -print0)
-fi
-
-if [ ${#wallpaper_options[@]} -gt 0 ]; then
-    wallpaper_options+=("None")
-    print_menu "Select a Wallpaper" wallpaper_options
-    wallpaper_choice=$(get_choice "${wallpaper_options[@]}")
-    if [ "$wallpaper_choice" -le "${#wallpaper_options[@]}" ] && [[ "${wallpaper_options[$((wallpaper_choice-1))]}" != "None" ]]; then
-        WALLPAPER_PATH="${wallpaper_options[$((wallpaper_choice-1))]}"
+# Function to prompt user for accent color
+prompt_accent_color() {
+    show_message "Choose your Accent Color:"
+    echo "Enter a HEX color code (e.g., 0xBD93F9 for Dracula Purple):"
+    read -p "Accent Color (e.g., 0xBD93F9): " ACCENT_COLOR
+    # Validate hex color format (basic check)
+    if [[ ! "$ACCENT_COLOR" =~ ^0x[0-9a-fA-F]{6}$ ]]; then
+        show_message "Invalid HEX color format. Please use 0xRRGGBB. Using default: 0xBD93F9"
+        ACCENT_COLOR="0xBD93F9" # Default Dracula Purple
     fi
-else
-    echo "No wallpapers found in $wallpaper_dir_user or $wallpaper_dir_system. You can add some later."
-fi
-
-# --- Final Confirmation ---
-echo
-echo "------------------------------------------------------"
-echo " Installation Summary"
-echo "------------------------------------------------------"
-echo " Gaps: ${gap_options[$((gap_choice-1))]}"
-echo " Waybar Position: ${waybar_pos_options[$((waybar_pos_choice-1))]}"
-echo " Clock: ${clock_options[$((clock_choice-1))]}"
-echo " Battery Meter: ${battery_confirm:-N}"
-echo " Terminal: ${terminal_options[$((terminal_choice-1))]}"
-echo " IDE: ${ide_options[$((ide_choice-1))]}"
-echo " File Manager: ${fm_options[$((fm_choice-1))]}"
-echo " Theme: Dracula"
-echo " Wallpaper: ${WALLPAPER_PATH:-None}"
-echo "------------------------------------------------------"
-echo
-read -p "Do you want to proceed with the installation? (y/N): " final_confirm
-if [[ "$final_confirm" != [yY] ]]; then
-    echo "Installation aborted."
-    exit 0
-fi
-
-# --- AUR Helper (yay) Installation ---
-if ! command -v yay &> /dev/null; then
-    echo "AUR helper 'yay' not found. Installing..."
-    sudo pacman -S --needed --noconfirm git base-devel
-    git clone https://aur.archlinux.org/yay.git
-    (cd yay && makepkg -si --noconfirm)
-    rm -rf yay
-    echo "'yay' installed successfully."
-else
-    echo "'yay' is already installed."
-fi
-
-# --- Package Installation ---
-echo "Updating system and installing necessary packages..."
-sudo pacman -Syu --needed --noconfirm "${pacman_packages[@]}"
-yay -S --needed --noconfirm "${aur_packages[@]}"
-
-# --- Seatd User Group and Service Setup ---
-CURRENT_USER=$(whoami)
-echo "Adding user '$CURRENT_USER' to the 'seat' and 'video' groups for seatd..."
-sudo usermod -aG seat "$CURRENT_USER"
-sudo usermod -aG video "$CURRENT_USER"
-
-echo "Enabling the seatd service..."
-sudo systemctl enable seatd.service
-
-# --- Configuration Directory Creation ---
-echo "Creating configuration directories..."
-mkdir -p ~/.config/hypr
-mkdir -p ~/.config/waybar
-mkdir -p ~/.config/rofi
-mkdir -p ~/.config/swaync
-mkdir -p ~/.config/Kvantum
-mkdir -p ~/.config/wlogout
-mkdir -p ~/.config/gtk-3.0
-mkdir -p ~/.config/gtk-4.0
-
-# --- Hyprland Configuration ---
-echo "Creating hyprland.conf..."
-cat <<EOF > ~/.config/hypr/hyprland.conf
-# -----------------------------------------------------
-# Hyprland Config (Dracula Theme)
-# -----------------------------------------------------
-
-# --- Monitor Configuration ---
-${MONITOR_CONFIG:-monitor=,preferred,auto,1}
-
-# --- Autostart Programs ---
-exec-once = ~/.config/hypr/autostart.sh
-
-# --- Environment Variables ---
-env = XCURSOR_SIZE,24
-env = GTK_THEME,Dracula
-env = QT_QPA_PLATFORMTHEME,kde
-env = QT_STYLE_OVERRIDE,kvantum
-env = XDG_CURRENT_DESKTOP,KDE
-
-# --- Input Devices ---
-input {
-    kb_layout = us
-    follow_mouse = 1
-    touchpad { natural_scroll = no }
-    sensitivity = 0
 }
 
-# --- General Settings ---
+# Function to prompt user for gap size
+prompt_gap_size() {
+    show_message "Choose Gap Size:"
+    echo "1) Small (5px)"
+    echo "2) Medium (10px)"
+    echo "3) Large (15px)"
+    echo "4) Custom"
+    read -p "Enter your choice (1-4): " gap_choice
+
+    case $gap_choice in
+        1) GAP_SIZE="5";;
+        2) GAP_SIZE="10";;
+        3) GAP_SIZE="15";;
+        4)
+            read -p "Enter custom gap size in pixels (e.g., 8): " custom_gap
+            if [[ "$custom_gap" =~ ^[0-9]+$ ]]; then
+                GAP_SIZE="$custom_gap"
+            else
+                show_message "Invalid input. Using default Medium (10px)."
+                GAP_SIZE="10"
+            fi
+            ;;
+        *)
+            show_message "Invalid choice. Using default Medium (10px)."
+            GAP_SIZE="10";;
+    esac
+}
+
+# Function to prompt user for Waybar position
+prompt_waybar_position() {
+    show_message "Choose Waybar Position:"
+    echo "1) Top"
+    echo "2) Bottom"
+    read -p "Enter your choice (1-2): " waybar_pos_choice
+
+    case $waybar_pos_choice in
+        1) WAYBAR_POSITION="top";;
+        2) WAYBAR_POSITION="bottom";;
+        *)
+            show_message "Invalid choice. Using default Top."
+            WAYBAR_POSITION="top";;
+    esac
+}
+
+# Function to prompt user for monitor resolution and refresh rate
+prompt_monitor_settings() {
+    show_message "Monitor Settings (for single monitor setups):"
+    echo "If you have multiple monitors, you will need to adjust 'monitor=' lines in hyprland.conf manually."
+    read -p "Enter your monitor resolution (e.g., 1920x1080): " MONITOR_RESOLUTION
+    read -p "Enter your monitor refresh rate (e.g., 144): " MONITOR_REFRESH_RATE
+
+    if [[ ! "$MONITOR_RESOLUTION" =~ ^[0-9]+x[0-9]+$ ]]; then
+        show_message "Invalid resolution format. Leaving monitor setting as 'auto'."
+        MONITOR_RESOLUTION="auto"
+        MONITOR_REFRESH_RATE=""
+    elif [[ ! "$MONITOR_REFRESH_RATE" =~ ^[0-9]+$ ]]; then
+        show_message "Invalid refresh rate format. Leaving monitor setting as 'auto'."
+        MONITOR_RESOLUTION="auto"
+        MONITOR_REFRESH_RATE=""
+    fi
+}
+
+# Function to prompt user for battery in Waybar
+prompt_battery_waybar() {
+    show_message "Enable Battery Module in Waybar (for laptops)?"
+    read -p "Enter 'y' for Yes or 'n' for No: " battery_choice
+    if [[ "$battery_choice" =~ ^[Yy]$ ]]; then
+        ENABLE_BATTERY="true"
+    else
+        ENABLE_BATTERY="false"
+    fi
+}
+
+# Function to create configuration directories
+create_config_dirs() {
+    show_message "Creating configuration directories..."
+    mkdir -p "$HYPR_CONFIG_DIR"
+    mkdir -p "$WAYBAR_CONFIG_DIR"
+    mkdir -p "$ROFI_CONFIG_DIR"
+    show_message "Directories created."
+}
+
+# Function to generate hyprland.conf
+generate_hyprland_conf() {
+    show_message "Generating hyprland.conf..."
+
+    cat << EOF > "$HYPR_CONFIG_DIR/hyprland.conf"
+# Hyprland Configuration generated by setup script
+
+# --- Variables ---
+\$mainMod = SUPER
+\$accentColor = $ACCENT_COLOR # User-defined accent color
+
+# --- Monitor ---
+# For single monitor setup. If you have multiple monitors, adjust this section.
+$(if [[ "$MONITOR_RESOLUTION" != "auto" ]]; then
+    echo "monitor=,${MONITOR_RESOLUTION}@${MONITOR_REFRESH_RATE},auto,1"
+else
+    echo "monitor=,preferred,auto,1"
+fi)
+
+# --- Autostart ---
+exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+exec-once = systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+exec-once = /usr/lib/polkit-gnome/polkit-agent-helper-1 # Or other polkit agent
+exec-once = waybar &
+exec-once = hyprpaper & # Or your preferred wallpaper setter
+exec-once = mako & # Notification daemon
+exec-once = seatd-launch hyprland # Using seatd for autostart
+
+# --- General ---
 general {
-    gaps_in = $gaps_in
-    gaps_out = $gaps_out
+    gaps_in = $GAP_SIZE
+    gaps_out = $(($GAP_SIZE * 2)) # Outer gaps are double inner gaps
     border_size = 2
-    col.active_border = rgba(${HYPR_ACCENT_COLOR}ee) rgba(${HYPR_GRADIENT_COLOR}ee) 45deg
-    col.inactive_border = rgba(44475aaa)
+    col.active_border = \$accentColor
+    col.inactive_border = 0x66333333 # Dark grey for inactive
     layout = dwindle
+    allow_tearing = false
 }
 
-# --- Decoration ---
+# --- Decorations ---
 decoration {
-    rounding = 10
-    blur { enabled = true, size = 5, passes = 2, new_optimizations = on, xray = true, noise = 0.0117, contrast = 0.8916, brightness = 0.8172 }
-    drop_shadow = yes
+    rounding = 5
+    blur {
+        enabled = true
+        size = 3
+        passes = 1
+        vibrancy = 0.16
+        # Semi-transparent apps blur
+        # This will apply blur to windows that are semi-transparent.
+        # Ensure your applications support transparency for this to work.
+    }
+    drop_shadow = true
     shadow_range = 4
-    shadow_render_power = 3
-    col.shadow = rgba(1a1a1aee)
+    shadow_render_power = 0.3
+    col.shadow = 0x66000000
 }
 
 # --- Animations ---
 animations {
-    enabled = yes
+    enabled = true
     bezier = myBezier, 0.05, 0.9, 0.1, 1.05
     animation = windows, 1, 7, myBezier
     animation = windowsOut, 1, 7, default, popin 80%
@@ -289,32 +187,49 @@ animations {
     animation = workspaces, 1, 6, default
 }
 
-# --- Layouts ---
-dwindle { pseudotile = yes, preserve_split = yes }
-master { new_is_master = true }
+# --- Input ---
+input {
+    kb_layout = us # Change to your keyboard layout
+    follow_mouse = 1
+    touchpad {
+        natural_scroll = false
+    }
+    sensitivity = 1.0 # 0.0 - 1.0, 0.0 = no sensitivity, 1.0 = full sensitivity
+}
+
+# --- Dwindle Layout ---
+dwindle {
+    pseudotile = true # Master switch for pseudotiling. Enabling it makes windows float when they're not the only window in a workspace.
+    preserve_split = true # You probably want this
+}
+
+# --- Gestures ---
+gestures {
+    workspace_swipe = true
+}
 
 # --- Window Rules ---
-windowrulev2 = float, class:^(kcalc|${FM_CMD}|nwg-look|wlogout|pavucontrol|nm-connection-editor)$
-windowrulev2 = float, title:^(Copying|Moving|Deleting|File Operation Progress)$
-windowrulev2 = noblur, class:^(wlogout)$
+windowrulev2 = opacity 0.8 0.8,class:^(Alacritty|kitty|wezterm)$
+windowrulev2 = opacity 0.8 0.8,class:^(Rofi)$
+windowrulev2 = float,class:^(Calculator|pavucontrol|btop)$
+windowrulev2 = center,class:^(Calculator|pavucontrol|btop)$
 
 # --- Keybindings ---
-\$mainMod = SUPER
-bind = \$mainMod, RETURN, exec, $TERM_CMD
-bind = \$mainMod, E, exec, $FM_CMD
-bind = \$mainMod, D, exec, rofi -show drun
-bind = \$mainMod, T, exec, $IDE_CMD
-bind = \$mainMod, C, exec, kcalc
-bind = \$mainMod, Q, killactive,
-bind = \$mainMod, M, exec, wlogout
-bind = \$mainMod, F, fullscreen,
-bind = \$mainMod, SPACE, togglefloating,
-bind = \$mainMod, P, pseudo,
-bind = \$mainMod, W, exec, pkill -SIGUSR1 waybar || waybar
-bind = \$mainMod, left, movefocus, l
-bind = \$mainMod, right, movefocus, r
-bind = \$mainMod, up, movefocus, u
-bind = \$mainMod, down, movefocus, d
+# Standard Hyprland shortcuts
+bind = \$mainMod, Q, killactive, # Quit focused app
+bind = \$mainMod, M, exit, # Quit Hyprland
+bind = \$mainMod, RETURN, exec, alacritty # Terminal (change to your preferred terminal)
+bind = \$mainMod, D, exec, rofi -show drun # Rofi
+bind = \$mainMod, B, exec, xdg-open https://google.com # Web Browser
+bind = \$mainMod, E, exec, thunar # File Explorer (change to your preferred file manager)
+bind = \$mainMod, SPACE, togglefloating, # Toggle focused app floating/tiling
+bind = \$mainMod, F, fullscreen, # Toggle fullscreen for focused app
+bind = \$mainMod, C, exec, gnome-calculator # Calculator
+bind = \$mainMod, P, exec, spotify # Music Streaming App (change to your preferred app)
+bind = \$mainMod, G, exec, steam # Steam
+bind = \$mainMod, V, exec, discord # Discord
+
+# Workspace switching
 bind = \$mainMod, 1, workspace, 1
 bind = \$mainMod, 2, workspace, 2
 bind = \$mainMod, 3, workspace, 3
@@ -325,6 +240,8 @@ bind = \$mainMod, 7, workspace, 7
 bind = \$mainMod, 8, workspace, 8
 bind = \$mainMod, 9, workspace, 9
 bind = \$mainMod, 0, workspace, 10
+
+# Move active window to a workspace
 bind = \$mainMod SHIFT, 1, movetoworkspace, 1
 bind = \$mainMod SHIFT, 2, movetoworkspace, 2
 bind = \$mainMod SHIFT, 3, movetoworkspace, 3
@@ -335,441 +252,436 @@ bind = \$mainMod SHIFT, 7, movetoworkspace, 7
 bind = \$mainMod SHIFT, 8, movetoworkspace, 8
 bind = \$mainMod SHIFT, 9, movetoworkspace, 9
 bind = \$mainMod SHIFT, 0, movetoworkspace, 10
+
+# Move focus with arrow keys
+bind = \$mainMod, left, movefocus, l
+bind = \$mainMod, right, movefocus, r
+bind = \$mainMod, up, movefocus, u
+bind = \$mainMod, down, movefocus, d
+
+# Move windows with arrow keys
+bind = \$mainMod SHIFT, left, movewindow, l
+bind = \$mainMod SHIFT, right, movewindow, r
+bind = \$mainMod SHIFT, up, movewindow, u
+bind = \$mainMod SHIFT, down, movewindow, d
+
+# Resize windows (example, adjust as needed)
+bind = \$mainMod CTRL, left, resizeactive, -50 0
+bind = \$mainMod CTRL, right, resizeactive, 50 0
+bind = \$mainMod CTRL, up, resizeactive, 0 -50
+bind = \$mainMod CTRL, down, resizeactive, 0 50
+
+# Scroll through workspaces with mouse
 bind = \$mainMod, mouse_down, workspace, e+1
 bind = \$mainMod, mouse_up, workspace, e-1
+
+# Move/resize windows with mouse
 bindm = \$mainMod, mouse:272, movewindow
 bindm = \$mainMod, mouse:273, resizewindow
-bind = , Print, exec, grim -g "\$(slurp)" - | swappy -f -
-bind = \$mainMod, Print, exec, grim -g "\$(hyprctl activewindow -j | jq -r '"\\(.at[0]),\\(.at[1]) \\(.size[0])x\\(.size[1])"') " - | swappy -f -
-EOF
 
-# --- Autostart Script Creation ---
-echo "Creating autostart.sh..."
-cat <<EOF > ~/.config/hypr/autostart.sh
-#!/bin/bash
-sleep 1
-/usr/lib/polkit-kde-authentication-agent-1 &
-waybar &
-swaync &
-swww init &
-(sleep 2 && ${WALLPAPER_PATH:+swww img "${WALLPAPER_PATH}" --transition-type any}) &
-EOF
-chmod +x ~/.config/hypr/autostart.sh
+# Toggle Waybar
+bind = \$mainMod, W, exec, pkill -SIGUSR1 waybar
 
-# --- Waybar Configuration ---
-echo "Creating Waybar config and style..."
-cat <<EOF > ~/.config/waybar/config.jsonc
+# Screenshots
+bind = , Print, exec, grim -g "\$(slurp)" - | wl-copy # Screenshot selected area to clipboard
+bind = \$mainMod, Print, exec, grim - | wl-copy # Screenshot full screen to clipboard
+
+# Volume control (requires pulseaudio-utils or pipewire-pulse)
+bind = , XF86AudioRaiseVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
+bind = , XF86AudioLowerVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bind = , XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+
+# Brightness control (requires brightnessctl)
+bind = , XF86MonBrightnessUp, exec, brightnessctl set +5%
+bind = , XF86MonBrightnessDown, exec, brightnessctl set 5%-
+
+# GTK/QT Theme (Instructions will be provided separately)
+# For GTK, you'll typically set this via ~/.config/gtk-3.0/settings.ini and ~/.config/gtk-4.0/settings.ini
+# For QT, you'll typically set this via qt5ct and qt6ct
+# The script will provide instructions on how to apply the full-dracula-theme-git.
+EOF
+    show_message "hyprland.conf generated successfully."
+}
+
+# Function to generate waybar/config
+generate_waybar_config() {
+    show_message "Generating waybar/config..."
+
+    cat << EOF > "$WAYBAR_CONFIG_DIR/config"
+// Waybar configuration generated by setup script
+
 {
-    "layer": "top",
-    "position": "$waybar_position",
-    "height": 40,
-    "modules-left": ["hyprland/workspaces", "hyprland/window"],
-    "modules-center": ["clock"],
-    "modules-right": [${waybar_battery_module}"tray", "pulseaudio", "network", "cpu", "memory"],
+    "layer": "top", // "bottom" or "top" based on user choice
+    "position": "$WAYBAR_POSITION",
+    "mod": "dock",
+    "height": 30,
+    "spacing": 4,
+    "margin-top": 0,
+    "margin-bottom": 0,
+    "margin-left": 0,
+    "margin-right": 0,
+
+    "modules-left": [
+        "hyprland/workspaces",
+        "hyprland/window"
+    ],
+    "modules-center": [
+        "clock"
+    ],
+    "modules-right": [
+        "cpu",
+        "memory",
+$(if [[ "$ENABLE_BATTERY" == "true" ]]; then
+    echo '        "battery",'
+fi)
+        "pulseaudio",
+        "network",
+        "tray"
+    ],
 
     "hyprland/workspaces": {
         "format": "{icon}",
-        "on-click": "activate",
         "format-icons": {
-            "default": "",
+            "1": "",
+            "2": "",
+            "3": "",
+            "4": "",
+            "5": "",
+            "6": "",
+            "7": "",
+            "8": "",
+            "9": "",
+            "10": "",
             "active": "",
-            "urgent": ""
-        }
-    },
-    "clock": {
-        "format": "$clock_format",
-        "tooltip-format": "<big>{:%Y %B}</big>\\n<tt><small>{calendar}</small></tt>"
-    },
-    ${waybar_battery_config}
-    "cpu": {
-        "format": " {usage}%",
-        "tooltip": true,
-        "on-click": "$TERM_CMD -e btop"
-    },
-    "memory": {
-        "format": " {}%",
-        "on-click": "$TERM_CMD -e btop"
-    },
-    "network": {
-        "format-wifi": "  {essid}",
-        "format-ethernet": "󰈀 {ifname}",
-        "format-disconnected": "⚠ Disconnected",
-        "tooltip-format": "{ifname} via {gwaddr} ",
-        "on-click": "nm-connection-editor"
-    },
-    "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-muted": " Muted",
-        "format-icons": {
-            "default": ["", ""]
+            "default": ""
         },
-        "on-click": "pavucontrol"
+        "on-click": "activate"
     },
+
+    "hyprland/window": {
+        "format": "" // Do not show focused app name
+    },
+
+    "clock": {
+        "format": "{:%H:%M}", // Time only
+        "tooltip-format": "<big>{:%Y %B %d}</big>\n<small>{:%A}</small>\n<small>{:%I:%M %p}</small>"
+    },
+
+    "cpu": {
+        "format": " {usage}%",
+        "tooltip": true,
+        "on-click": "alacritty -e btop",
+        "interval": 1
+    },
+
+    "memory": {
+        "format": " {}%",
+        "tooltip": true,
+        "on-click": "alacritty -e btop",
+        "interval": 1
+    },
+$(if [[ "$ENABLE_BATTERY" == "true" ]]; then
+    echo '    "battery": {
+        "bat": "",
+        "full": "",
+        "charging": "ładowanie",
+        "format": "{icon} {capacity}%",
+        "format-charging": "ładowanie {capacity}%",
+        "format-discharging": " {capacity}%",
+        "format-full": " {capacity}%",
+        "format-alt": "{time} {icon}",
+        "tooltip": true,
+        "states": {
+            "good": 90,
+            "warning": 30,
+            "critical": 15
+        }
+    },'
+fi)
+
+    "pulseaudio": {
+        "format": " {volume}%",
+        "format-muted": " Muted",
+        "on-click": "pavucontrol",
+        "tooltip": true
+    },
+
+    "network": {
+        "format-wifi": " {essid}",
+        "format-ethernet": " {ipaddr}/{ifname}",
+        "format-disconnected": " Disconnected",
+        "tooltip": true
+    },
+
     "tray": {
         "icon-size": 18,
         "spacing": 10
     }
 }
 EOF
+    show_message "waybar/config generated successfully."
+}
 
-cat <<EOF > ~/.config/waybar/style.css
+# Function to generate waybar/style.css
+generate_waybar_style() {
+    show_message "Generating waybar/style.css..."
+
+    cat << EOF > "$WAYBAR_CONFIG_DIR/style.css"
+/* Waybar Style Sheet generated by setup script */
+
 * {
     border: none;
-    border-radius: 10px;
-    font-family: Noto Sans, FontAwesome;
-    font-size: 14px;
+    border-radius: 5px;
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
     min-height: 0;
 }
 
 window#waybar {
-    background-color: rgba(40, 42, 54, 0.85); /* Dracula BG with transparency */
-    color: #f8f8f2; /* Dracula FG */
-    border: 2px solid $ACCENT_COLOR;
-    border-radius: 15px;
-}
-
-#workspaces button.active {
-    background: $ACCENT_COLOR;
-    color: #282a36; /* Dracula BG for contrast */
+    background-color: rgba(44, 47, 58, 0.8); /* Dark background with transparency */
+    border-bottom: 2px solid $ACCENT_COLOR; /* Accent color border */
+    color: #f8f8f2; /* Light text color */
 }
 
 #workspaces button {
-    padding: 0 10px;
-    background: transparent;
+    padding: 0 5px;
+    background-color: transparent;
     color: #f8f8f2;
-    border-radius: 10px;
+    border-bottom: 2px solid transparent;
 }
 
 #workspaces button:hover {
-    background: #44475a; /* Dracula Selection */
+    background-color: rgba(68, 71, 90, 0.5);
+    border-bottom: 2px solid \$accentColor;
 }
 
-#window, #clock, #cpu, #memory, #pulseaudio, #network, #tray, #battery {
+#workspaces button.active {
+    background-color: rgba(68, 71, 90, 0.7);
+    border-bottom: 2px solid $ACCENT_COLOR;
+}
+
+#workspaces button.urgent {
+    background-color: #ff5555; /* Red for urgent workspace */
+}
+
+#clock,
+#cpu,
+#memory,
+#battery,
+#pulseaudio,
+#network,
+#tray,
+#hyprland-window {
     padding: 0 10px;
-    margin: 5px;
-    background-color: #44475a; /* Dracula Selection */
-    border-radius: 10px;
+    margin: 0 4px;
+    background-color: rgba(68, 71, 90, 0.4); /* Dracula background for modules */
+    border: 1px solid $ACCENT_COLOR; /* Accent color border for modules */
+}
+
+#clock {
+    font-weight: bold;
+}
+
+#cpu {
+    color: #ff79c6; /* Pink */
+}
+
+#memory {
+    color: #50fa7b; /* Green */
+}
+
+#battery {
+    color: #ffb86c; /* Orange */
+}
+
+#battery.charging {
+    color: #8be9fd; /* Cyan when charging */
+}
+
+#battery.warning {
+    color: #ff5555; /* Red when warning */
+}
+
+#pulseaudio {
+    color: #bd93f9; /* Purple */
+}
+
+#network {
+    color: #f1fa8c; /* Yellow */
+}
+
+#tray {
+    background-color: rgba(68, 71, 90, 0.6);
+}
+
+/* Tooltips */
+tooltip {
+    background-color: rgba(44, 47, 58, 0.9);
+    border: 1px solid $ACCENT_COLOR;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 12px;
+    color: #f8f8f2;
 }
 EOF
-
-# --- Rofi Configuration ---
-echo "Creating Rofi config..."
-cat <<EOF > ~/.config/rofi/config.rasi
-configuration {
-    modi: "drun,run,window";
-    show-icons: true;
-    font: "Noto Sans 12";
+    show_message "waybar/style.css generated successfully."
 }
 
-@theme "/dev/null"
+# Function to generate rofi/config.rasi
+generate_rofi_config() {
+    show_message "Generating rofi/config.rasi..."
 
+    # Extract hex color without 0x prefix for Rofi
+    ROFI_ACCENT_HEX="${ACCENT_COLOR#0x}"
+
+    cat << EOF > "$ROFI_CONFIG_DIR/config.rasi"
+/* Rofi configuration generated by setup script */
+
+configuration {
+    modi: "drun,run";
+    display-drun: "Apps";
+    display-run: "Run";
+    show-icons: true;
+    icon-theme: "Dracula"; /* Assuming Dracula icon theme is installed */
+    terminal: "alacritty"; /* Change to your preferred terminal */
+    drun-display-format: "{name}";
+    font: "Inter 10";
+    theme: "full-dracula-theme-git"; /* Rofi theme matching Dracula */
+}
+
+@theme "full-dracula-theme-git"
+
+/* Override colors for borders */
 * {
-    /* Dracula */
-    bg: #282a36;
-    bg-alt: #44475a;
-    fg: #f8f8f2;
-    accent: $ACCENT_COLOR;
-
-    background-color: transparent;
-    text-color: @fg;
+    accent-color: #$ROFI_ACCENT_HEX;
 }
 
 window {
-    background-color: rgba(40, 42, 54, 0.9); /* bg with transparency */
     border: 2px;
-    border-color: @accent;
-    border-radius: 15px;
-    width: 50%;
-    padding: 20px;
-}
-
-mainbox {
-    children: [inputbar, listview];
-    spacing: 15px;
+    border-color: @accent-color;
+    border-radius: 8px;
+    background-color: #282a36; /* Dracula background */
 }
 
 inputbar {
-    children: [prompt, entry];
-    background-color: @bg-alt;
-    border-radius: 10px;
-    padding: 10px;
+    border: 1px;
+    border-color: @accent-color;
+    border-radius: 5px;
+    background-color: #44475a; /* Dracula foreground */
+    padding: 5px;
 }
 
-prompt { text-color: @accent; }
-entry { placeholder: "Search..."; }
+entry {
+    placeholder-color: #f8f8f2;
+    text-color: #f8f8f2;
+}
 
 listview {
-    lines: 8;
-    cycle: true;
-    dynamic: true;
-    layout: vertical;
+    background-color: #282a36;
+    border-radius: 5px;
+    margin: 5px 0;
 }
 
 element {
-    padding: 10px;
-    border-radius: 10px;
+    padding: 5px;
+    background-color: transparent;
+    text-color: #f8f8f2;
+    border-radius: 3px;
+}
+
+element selected {
+    background-color: @accent-color;
+    text-color: #282a36;
 }
 
 element-icon {
-    size: 24px;
-    padding: 0 10px 0 0;
-}
-
-element.selected.normal {
-    background-color: @accent;
-    text-color: @bg;
+    size: 1em;
 }
 EOF
-
-# --- wlogout Configuration ---
-echo "Creating wlogout config..."
-cat <<EOF > ~/.config/wlogout/layout.json
-{
-    "buttons": [
-        { "label": "Shutdown", "action": "systemctl poweroff", "keybind": "s" },
-        { "label": "Reboot", "action": "systemctl reboot", "keybind": "r" },
-        { "label": "Logout", "action": "hyprctl dispatch exit", "keybind": "l" },
-        { "label": "Lock", "action": "swaylock", "keybind": "k" }
-    ]
-}
-EOF
-
-cat <<EOF > ~/.config/wlogout/style.css
-window {
-    background-color: rgba(40, 42, 54, 0.9); /* Dracula BG with transparency */
-    font-family: Noto Sans;
-    font-size: 16pt;
-    color: #f8f8f2; /* Dracula FG */
+    show_message "rofi/config.rasi generated successfully."
 }
 
-button {
-    background-color: #44475a; /* Dracula Selection */
-    color: #f8f8f2;
-    border: 2px solid #282a36; /* Dracula BG */
-    border-radius: 15px;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 25%;
+# Function to provide installation instructions
+provide_installation_instructions() {
+    show_message "--- Installation Instructions ---"
+    echo "This script assumes you are on an Arch-based distribution or similar."
+    echo "You will need to install the following packages:"
+    echo ""
+    echo "1. Core components:"
+    echo "   sudo pacman -S hyprland waybar rofi alacritty btop thunar grim slurp wl-clipboard mako brightnessctl pulseaudio-ctl"
+    echo "   (Adjust terminal, file manager, etc., to your preference)"
+    echo ""
+    echo "2. GTK/Qt Theme (full-dracula-theme-git):"
+    echo "   This theme is typically found in the AUR (Arch User Repository)."
+    echo "   If you use an AUR helper like 'yay' or 'paru', you can install it with:"
+    echo "   yay -S full-dracula-theme-git"
+    echo "   paru -S full-dracula-theme-git"
+    echo "   After installation, set the GTK theme using lxappearance or by editing:"
+    echo "   ~/.config/gtk-3.0/settings.ini"
+    echo "   ~/.config/gtk-4.0/settings.ini"
+    echo "   [Settings]"
+    echo "   gtk-theme-name=Dracula"
+    echo "   gtk-icon-theme-name=Dracula"
+    echo "   gtk-cursor-theme-name=Dracula"
+    echo "   For Qt apps, install qt5ct and qt6ct and set the theme there."
+    echo "   qt5ct"
+    echo "   qt6ct"
+    echo "   And set QT_QPA_PLATFORMTHEME=qt5ct or QT_QPA_PLATFORMTHEME=qt6ct in your environment."
+    echo ""
+    echo "3. Seatd for autostart:"
+    echo "   sudo pacman -S seatd"
+    echo "   sudo usermod -a -G seat \$USER"
+    echo "   sudo systemctl enable seatd"
+    echo "   sudo systemctl start seatd"
+    echo "   (You might need to reboot or log out/in for group changes to take effect)"
+    echo ""
+    echo "4. Wallpaper (hyprpaper):"
+    echo "   Install hyprpaper: sudo pacman -S hyprpaper"
+    echo "   Edit ~/.config/hypr/hyprpaper.conf to set your wallpaper:"
+    echo "   preload = /path/to/your/wallpaper.jpg"
+    echo "   wallpaper = ,/path/to/your/wallpaper.jpg"
+    echo ""
+    show_message "--- Next Steps ---"
+    echo "1. Review the generated configuration files in:"
+    echo "   $HYPR_CONFIG_DIR/hyprland.conf"
+    echo "   $WAYBAR_CONFIG_DIR/config"
+    echo "   $WAYBAR_CONFIG_DIR/style.css"
+    echo "   $ROFI_CONFIG_DIR/config.rasi"
+    echo "   Make any manual adjustments as needed."
+    echo ""
+    echo "2. Install the necessary packages as listed above."
+    echo ""
+    echo "3. After installing Hyprland and seatd, and adding yourself to the 'seat' group,"
+    echo "   you can start Hyprland from your login manager (e.g., GDM, SDDM, LightDM)"
+    echo "   or directly from a TTY using: seatd-launch Hyprland"
+    echo ""
+    echo "Enjoy your new Hyprland setup!"
 }
 
-button:focus, button:active, button:hover {
-    background-color: $ACCENT_COLOR;
-    color: #282a36;
-    border: 2px solid $ACCENT_COLOR;
-    outline-style: none;
-}
+# --- Main Script Execution ---
 
-#lock { background-image: image(url("/usr/share/wlogout/icons/lock.png")); }
-#logout { background-image: image(url("/usr/share/wlogout/icons/logout.png")); }
-#reboot { background-image: image(url("/usr/share/wlogout/icons/reboot.png")); }
-#shutdown { background-image: image(url("/usr/share/wlogout/icons/shutdown.png")); }
-EOF
+show_message "Welcome to the Hyprland Automated Setup Script!"
+show_message "This script will help you configure Hyprland, Waybar, and Rofi."
+show_message "It will create/overwrite files in ~/.config/hypr, ~/.config/waybar, and ~/.config/rofi."
+read -p "Do you want to proceed? (y/n): " proceed_choice
 
-
-# --- Theming Setup ---
-echo "Applying GTK and QT themes..."
-GTK_THEME="Dracula"
-KVANTUM_THEME="Dracula"
-ICON_THEME="Dracula"
-CURSOR_THEME="Dracula"
-FONT="Noto Sans 11"
-
-# GTK3 settings
-cat <<EOF > ~/.config/gtk-3.0/settings.ini
-[Settings]
-gtk-theme-name=$GTK_THEME
-gtk-icon-theme-name=$ICON_THEME
-gtk-cursor-theme-name=$CURSOR_THEME
-gtk-font-name=$FONT
-EOF
-ln -sf ~/.config/gtk-3.0/settings.ini ~/.config/gtk-4.0/settings.ini
-
-# Kvantum settings
-cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
-[General]
-theme=$KVANTUM_THEME
-EOF
-
-# --- Create Comprehensive kdeglobals for Full Color Theming ---
-echo "Creating comprehensive kdeglobals file to force correct Qt colors..."
-cat <<'EOF' > ~/.config/kdeglobals
-[General]
-ColorScheme=Dracula
-Name=Dracula
-widgetStyle=Kvantum
-
-[Icons]
-Theme=Dracula
-
-[Fonts]
-General=Noto Sans,11,-1,5,50,0,0,0,0,0
-
-[Colors:Window]
-ActiveBackground=80,250,123
-ActiveForeground=40,42,54
-BackgroundAlternate=40,42,54
-BackgroundNormal=40,42,54
-DecorationFocus=80,250,123
-DecorationHover=80,250,123
-ForegroundActive=255,121,198
-ForegroundInactive=98,114,164
-ForegroundLink=139,233,253
-ForegroundNegative=255,85,85
-ForegroundNeutral=241,250,140
-ForegroundNormal=248,248,242
-ForegroundPositive=80,250,123
-ForegroundVisited=189,147,249
-
-[Colors:View]
-BackgroundNormal=40,42,54
-ForegroundNormal=248,248,242
-BackgroundAlternate=40,42,54
-BackgroundActive=68,71,90
-ForegroundActive=248,248,242
-ForegroundInactive=98,114,164
-ForegroundLink=139,233,253
-ForegroundVisited=189,147,249
-
-[Colors:Button]
-BackgroundNormal=68,71,90
-ForegroundNormal=248,248,242
-
-[WM]
-activeBackground=80,250,123
-activeForeground=40,42,54
-inactiveBackground=68,71,90
-inactiveForeground=98,114,164
-EOF
-
-# --- KDE/Qt Application-Specific Theming ---
-echo "Applying Dracula theme to Konsole and Kate for a cohesive look..."
-
-# Create directories for custom themes and profiles
-mkdir -p ~/.local/share/konsole/
-mkdir -p ~/.local/share/org.kde.syntax-highlighting/themes/
-
-# 1. Konsole Theming (Terminal Area)
-cat <<'EOF' > ~/.local/share/konsole/Dracula.colorscheme
-[Color]
-Name=Dracula
-[General]
-Description=Dracula Theme
-[Background]
-Color=40,42,54
-[Foreground]
-Color=248,248,242
-[Color0]
-Color=0,0,0
-[Color0Intense]
-Color=98,114,164
-[Color1]
-Color=255,85,85
-[Color1Intense]
-Color=255,102,102
-[Color2]
-Color=80,250,123
-[Color2Intense]
-Color=97,255,139
-[Color3]
-Color=241,250,140
-[Color3Intense]
-Color=244,255,157
-[Color4]
-Color=189,147,249
-[Color4Intense]
-Color=198,160,255
-[Color5]
-Color=255,121,198
-[Color5Intense]
-Color=255,138,206
-[Color6]
-Color=139,233,253
-[Color6Intense]
-Color=155,239,255
-[Color7]
-Color=191,191,191
-[Color7Intense]
-Color=255,255,255
-EOF
-
-cat <<'EOF' > ~/.local/share/konsole/Dracula.profile
-[Appearance]
-ColorScheme=Dracula
-[General]
-Name=Dracula
-Parent=FALLBACK/
-EOF
-
-cat <<EOF > ~/.config/konsolerc
-[Desktop Entry]
-DefaultProfile=Dracula.profile
-EOF
-
-# 2. Kate Theming (Editor Area)
-cat <<'EOF' > ~/.local/share/org.kde.syntax-highlighting/themes/Dracula.theme
-{"metadata":{"name":"Dracula","revision":1},"text-styles":{"Normal":{"text-color":"#f8f8f2"},"Keyword":{"text-color":"#ff79c6","bold":true},"Function":{"text-color":"#50fa7b"},"Variable":{"text-color":"#8be9fd","italic":true},"ControlFlow":{"text-color":"#ff79c6","bold":true},"Operator":{"text-color":"#ff79c6"},"BuiltIn":{"text-color":"#8be9fd","italic":true},"Extension":{},"Preprocessor":{"text-color":"#50fa7b"},"Attribute":{"text-color":"#50fa7b"},"Char":{"text-color":"#f1fa8c"},"SpecialChar":{"text-color":"#f1fa8c"},"String":{"text-color":"#f1fa8c"},"VerbatimString":{"text-color":"#f1fa8c"},"SpecialString":{"text-color":"#f1fa8c"},"Import":{},"DataType":{"text-color":"#8be9fd","italic":true},"Decimal":{"text-color":"#bd93f9"},"BaseN":{"text-color":"#bd93f9"},"Float":{"text-color":"#bd93f9"},"Constant":{"text-color":"#8be9fd","italic":true},"Comment":{"text-color":"#6272a4"},"Documentation":{"text-color":"#6272a4"},"Annotation":{"text-color":"#f1fa8c"},"CommentVar":{"text-color":"#8be9fd","italic":true},"RegionMarker":{"text-color":"#f1fa8c"},"Information":{"text-color":"#6272a4"},"Warning":{"text-color":"#f1fa8c"},"Alert":{"text-color":"#ffb86c","background-color":"#6272a4","bold":true},"Error":{"text-color":"#ff5555","underline":true},"Others":{}},"editor-colors":{"BackgroundColor":"#282a36","CodeFolding":"#6272a4","BracketMatching":"#6272a4","CurrentLine":"#44475a","IconBorder":"#44475a","IndentationLine":"#44475a","LineNumbers":"#6272a4","MarkBookmark":"#ff79c6","MarkError":"#ff5555","MarkWarning":"#f1fa8c","ModifiedLines":"#ffb86c","ReplaceHighlight":"#ffb86c","SavedLines":"#50fa7b","SearchHighlight":"#ffb86c","Separator":"#44475a","SpellChecking":"#ff5555","TabMarker":"#44475a","TemplateBackground":"#44475a","TemplatePlaceholder":"#bd93f9","TemplateFocusedPlaceholder":"#ff79c6","WordWrapMarker":"#44475a"}}
-EOF
-
-cat <<EOF > ~/.config/katerc
-[General]
-Color Theme=Dracula
-EOF
-
-
-# --- Autostart Configuration ---
-read -p "Do you want to enable automatic login and startup of Hyprland (bypassing a login manager)? (y/N): " autostart_confirm
-if [[ "$autostart_confirm" == [yY] ]]; then
-
-    ### Create the single, all-in-one systemd service for autostart ###
-    echo "Creating final systemd service for direct autostart..."
-    AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
-
-    cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
-[Unit]
-Description=Directly starts Hyprland for user %i
-After=systemd-user-sessions.service seatd.service
-
-[Service]
-User=%i
-WorkingDirectory=/home/%i
-# This directive creates a full login session, providing Hyprland
-# with graphics, input, and basic environment variables.
-PAMName=login
-# Explicitly pass the config file to Hyprland to remove any ambiguity.
-ExecStart=/usr/bin/Hyprland --config /home/%i/.config/hypr/hyprland.conf
-Restart=always
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    ### Enable the new service and remove all traces of the old methods ###
-    echo "Disabling conflicting services and enabling the new direct autostart service..."
-
-    # Disable the standard TTY login to prevent conflicts
-    sudo systemctl disable getty@tty1.service
-
-    # Enable the new, single service
-    sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
-
-    # Remove any old, problematic commands from .bash_profile, just in case.
-    sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
-
-    echo
-    echo "Autostart configured with the final, direct PAM-based systemd method."
+if [[ ! "$proceed_choice" =~ ^[Yy]$ ]]; then
+    show_message "Script aborted. No changes were made."
+    exit 0
 fi
 
+prompt_accent_color
+prompt_gap_size
+prompt_waybar_position
+prompt_monitor_settings
+prompt_battery_waybar
 
-# --- Final Instructions ---
-echo
-echo "------------------------------------------------------"
-echo " ✅ Installation Complete!"
-echo "------------------------------------------------------"
-echo "All configurations have been generated based on your choices."
-echo
-echo "The system has been configured to use 'seatd' for device management."
-echo "A FULL REBOOT IS REQUIRED for all changes to take effect."
-echo
-echo "Please run 'sudo reboot' now."
+create_config_dirs
+generate_hyprland_conf
+generate_waybar_config
+generate_waybar_style
+generate_rofi_config
+
+provide_installation_instructions
+
+show_message "Hyprland setup script finished."
