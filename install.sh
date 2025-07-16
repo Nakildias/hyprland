@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Complete Hyprland Installation Script
+# This version incorporates the final 'seatd' fix for reliable autostart.
 
 # Abort on any error
 set -e
@@ -92,7 +95,7 @@ fi
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
-    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq
+    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
 )
 aur_packages=(wlogout)
 
@@ -236,6 +239,15 @@ fi
 echo "Updating system and installing necessary packages..."
 sudo pacman -Syu --needed --noconfirm "${pacman_packages[@]}"
 yay -S --needed --noconfirm "${aur_packages[@]}"
+
+# --- Seatd User Group and Service Setup ---
+CURRENT_USER=$(whoami)
+echo "Adding user '$CURRENT_USER' to the 'seat' and 'video' groups for seatd..."
+sudo usermod -aG seat "$CURRENT_USER"
+sudo usermod -aG video "$CURRENT_USER"
+
+echo "Enabling the seatd service..."
+sudo systemctl enable seatd.service
 
 # --- Configuration Directory Creation ---
 echo "Creating configuration directories..."
@@ -386,6 +398,27 @@ bindm = \$mainMod, mouse:273, resizewindow
 bind = , Print, exec, grim -g "\$(slurp)" - | swappy -f -
 bind = \$mainMod, Print, exec, grim -g "\$(hyprctl activewindow -j | jq -r '"\\(.at[0]),\\(.at[1]) \\(.size[0])x\\(.size[1])"') " - | swappy -f -
 EOF
+
+# --- Autostart Script Creation ---
+echo "Creating autostart.sh..."
+cat <<EOF > ~/.config/hypr/autostart.sh
+#!/bin/bash
+
+# A small delay to ensure services are ready
+sleep 1
+
+# Start key daemons in the background
+/usr/lib/polkit-kde-authentication-agent-1 &
+waybar &
+swaync &
+swww init &
+
+# Set wallpaper after a short delay
+(sleep 2 && ${WALLPAPER_PATH:+swww img "${WALLPAPER_PATH}" --transition-type any}) &
+EOF
+
+# Make the script executable
+chmod +x ~/.config/hypr/autostart.sh
 
 # --- Waybar Configuration ---
 echo "Creating Waybar config and style..."
@@ -620,32 +653,10 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 theme=KvAdaptaDark
 EOF
 
-# --- Autostart Script Creation ---
-echo "Creating autostart.sh..."
-cat <<EOF > ~/.config/hypr/autostart.sh
-#!/bin/bash
-
-# A small delay to ensure services are ready
-sleep 1
-
-# Start key daemons in the background
-/usr/lib/polkit-kde-authentication-agent-1 &
-waybar &
-swaync &
-swww init &
-
-# Set wallpaper after a short delay
-(sleep 2 && ${WALLPAPER_PATH:+swww img "${WALLPAPER_PATH}" --transition-type any}) &
-EOF
-
-# Make the script executable
-chmod +x ~/.config/hypr/autostart.sh
-
 # --- Autostart Configuration ---
 read -p "Do you want to enable automatic login and startup of Hyprland (bypassing a login manager)? (y/N): " autostart_confirm
 if [[ "$autostart_confirm" == [yY] ]]; then
-    CURRENT_USER=$(whoami)
-
+    
     ### Create the single, all-in-one systemd service for autostart ###
     echo "Creating final systemd service for direct autostart..."
     AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
@@ -653,7 +664,7 @@ if [[ "$autostart_confirm" == [yY] ]]; then
     cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
 [Unit]
 Description=Directly starts Hyprland for user %i
-After=systemd-user-sessions.service
+After=systemd-user-sessions.service seatd.service
 
 [Service]
 User=%i
@@ -661,9 +672,7 @@ WorkingDirectory=/home/%i
 # This directive creates a full login session, providing Hyprland
 # with graphics, input, and basic environment variables.
 PAMName=login
-# The final fix: Explicitly pass the config file to Hyprland.
-# This removes any ambiguity and prevents it from crashing if it
-# cannot find its config in the minimal service environment.
+# Explicitly pass the config file to Hyprland to remove any ambiguity.
 ExecStart=/usr/bin/Hyprland --config /home/%i/.config/hypr/hyprland.conf
 Restart=always
 StandardOutput=journal
@@ -681,17 +690,14 @@ EOF
     
     # Enable the new, single service
     sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
-
-    # Remove the now-unused user service file, if it exists
-    rm -f "$HOME/.config/systemd/user/hyprland-session.service"
     
     # Remove any old, problematic commands from .bash_profile, just in case.
     sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
 
     echo
     echo "Autostart configured with the final, direct PAM-based systemd method."
-    echo "This should be the final fix."
 fi
+
 
 # --- Final Instructions ---
 echo
@@ -700,7 +706,8 @@ echo " Installation Complete!"
 echo "------------------------------------------------------"
 echo "All configurations have been generated based on your choices."
 echo
-echo "The autostart method has been replaced with a more reliable, direct systemd service."
-echo "Please reboot now to apply all changes and start your new Hyprland desktop."
+echo "The system has been configured to use 'seatd' for device management."
+echo "A FULL REBOOT IS REQUIRED for all changes to take effect."
 echo
-echo "NOTE: If you have a multi-monitor setup, please edit ~/.config/hypr/hyprland.conf to match your display configuration."
+echo "Please run 'sudo reboot' now."
+echo
