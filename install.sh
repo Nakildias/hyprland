@@ -260,6 +260,9 @@ mkdir -p ~/.config/rofi
 mkdir -p ~/.config/swaync
 mkdir -p ~/.config/Kvantum
 mkdir -p ~/.config/wlogout
+mkdir -p ~/.config/qt5ct    # <-- Add this line
+mkdir -p ~/.config/qt6ct    # <-- Add this line
+mkdir -p ~/.config/gtk-3.0  # <-- Also adding this from later in the script for consistency
 # systemd directory creation is handled in its own section now
 
 # --- Hyprland Configuration ---
