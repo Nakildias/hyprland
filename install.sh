@@ -691,19 +691,18 @@ EOF
     # 3. Configure shell profile to trigger the systemd graphical session.
     echo "Configuring shell profile to launch the graphical session..."
     PROFILE_FILE="$HOME/.bash_profile"
+    # FIX: Use the more reliable '$XDG_VTNR' variable instead of the 'tty' command.
     LAUNCH_CMD="
 # Start the graphical session on TTY1
-if [ -z \"\$DISPLAY\" ] && [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then
+if [ -z \"\$DISPLAY\" ] && [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$XDG_VTNR\" -eq 1 ]; then
   exec systemctl --user --wait start graphical-session.target
 fi"
 
     # Add the command to .bash_profile if it's not already there
-    if ! grep -q "graphical-session.target" "$PROFILE_FILE" 2>/dev/null; then
-        echo -e "$LAUNCH_CMD" >> "$PROFILE_FILE"
-        echo "Graphical session launch command added to $PROFILE_FILE."
-    else
-        echo "Graphical session launch command already exists in $PROFILE_FILE."
-    fi
+    # To ensure the new version is applied, we first remove the old command
+    sed -i "/graphical-session.target/d" "$PROFILE_FILE" 2>/dev/null
+    echo -e "$LAUNCH_CMD" >> "$PROFILE_FILE"
+    echo "Graphical session launch command updated in $PROFILE_FILE."
 fi
 
 
