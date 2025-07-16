@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Complete Hyprland Installation Script
-# This version incorporates the final 'seatd' fix for reliable autostart.
+# This version incorporates a unified theming system and improved Waybar integration.
 
 # Abort on any error
 set -e
@@ -91,13 +91,24 @@ EBC
 )
 fi
 
-# 5. Default Applications
+# 5. Default Applications & Dependencies
+# ---- START MODIFICATION: Added packages for theming and functionality ----
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
+    # Core dependencies for new features
+    plasma-systemmonitor networkmanager plasma-nm plasma-pa kio
+    # Theming packages
+    catppuccin-gtk-theme-mocha papirus-icon-theme catppuccin-cursors-mocha
 )
-aur_packages=(wlogout)
+aur_packages=(
+    wlogout
+    # Kvantum theme for Catppuccin
+    catppuccin-kvantum-git
+)
+# ---- END MODIFICATION ----
+
 
 # Terminal
 terminal_options=("Konsole" "Alacritty" "Kitty")
@@ -141,6 +152,19 @@ color_map=(
     ["7"]="#282a36" # Black
     ["8"]="#f8f8f2" # White
 )
+# ---- START MODIFICATION: Map choices to Catppuccin accent names ----
+cattpuccin_map=(
+    ["1"]="Blue"
+    ["2"]="Red"
+    ["3"]="Yellow" # User's Orange -> Catppuccin Yellow
+    ["4"]="Mauve"  # User's Purple -> Catppuccin Mauve
+    ["5"]="Yellow"
+    ["6"]="Green"
+    ["7"]="Blue"   # Default for Black
+    ["8"]="Blue"   # Default for White
+)
+# ---- END MODIFICATION ----
+
 print_menu "Choose an Accent Color" accent_options
 color_choice=$(get_choice "${accent_options[@]}")
 
@@ -149,8 +173,10 @@ if [ "$color_choice" -eq 9 ]; then
     while ! [[ "$ACCENT_COLOR" =~ ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$ ]]; do
         read -p "Invalid format. Please enter a valid hex color: " ACCENT_COLOR
     done
+    CATT_ACCENT="Blue" # Default to Blue accent for Catppuccin theme on custom color
 else
     ACCENT_COLOR=${color_map[$color_choice]}
+    CATT_ACCENT=${cattpuccin_map[$color_choice]}
 fi
 HYPR_ACCENT_COLOR=${ACCENT_COLOR#\#}
 
@@ -168,7 +194,7 @@ if [ -d "$wallpaper_dir_user" ]; then
     done < <(find "$wallpaper_dir_user" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \) -print0)
 fi
 if [ -d "$wallpaper_dir_system" ]; then
-     while IFS= read -r -d $'\0' file; do
+      while IFS= read -r -d $'\0' file; do
         wallpaper_options+=("$file")
     done < <(find "$wallpaper_dir_system" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \) -print0)
 fi
@@ -197,6 +223,7 @@ echo " Terminal: ${terminal_options[$((terminal_choice-1))]}"
 echo " IDE: ${ide_options[$((ide_choice-1))]}"
 echo " File Manager: ${fm_options[$((fm_choice-1))]}"
 echo " Accent Color: $ACCENT_COLOR"
+echo " Theme: Catppuccin Mocha with $CATT_ACCENT accent"
 echo " Wallpaper: ${WALLPAPER_PATH:-None}"
 echo "------------------------------------------------------"
 echo
@@ -260,8 +287,12 @@ mkdir -p ~/.config/wlogout
 mkdir -p ~/.config/qt5ct
 mkdir -p ~/.config/qt6ct
 mkdir -p ~/.config/gtk-3.0
+mkdir -p ~/.config/gtk-4.0
 
 # --- Hyprland Configuration ---
+# ---- START MODIFICATION: Define theme variables for hyprland.conf ----
+GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
+# ---- END MODIFICATION ----
 echo "Creating hyprland.conf..."
 cat <<EOF > ~/.config/hypr/hyprland.conf
 # -----------------------------------------------------
@@ -276,8 +307,13 @@ ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
+# ---- START MODIFICATION: Set environment for unified theming ----
 env = XCURSOR_SIZE,24
+env = GTK_THEME,$GTK_THEME
 env = QT_QPA_PLATFORMTHEME,qt5ct
+env = QT_STYLE_OVERRIDE,kvantum
+env = XDG_CURRENT_DESKTOP,KDE
+# ---- END MODIFICATION ----
 
 # --- Input Devices ---
 input {
@@ -305,6 +341,11 @@ decoration {
         size = 5
         passes = 2
         new_optimizations = on
+        # Make background of windows transparent
+        xray = true
+        noise = 0.0117
+        contrast = 0.8916
+        brightness = 0.8172
     }
     drop_shadow = yes
     shadow_range = 4
@@ -332,7 +373,7 @@ dwindle {
 master { new_is_master = true }
 
 # --- Window Rules ---
-windowrulev2 = float, class:^(kcalc|${FM_CMD}|qt5ct|qt6ct|nwg-look|wlogout)$
+windowrulev2 = float, class:^(kcalc|${FM_CMD}|qt5ct|qt6ct|nwg-look|wlogout|pavucontrol|nm-connection-editor|systemsettings5)$
 windowrulev2 = float, title:^(Copying|Moving|Deleting|File Operation Progress)$
 windowrulev2 = noblur, class:^(wlogout)$
 
@@ -422,6 +463,7 @@ chmod +x ~/.config/hypr/autostart.sh
 
 # --- Waybar Configuration ---
 echo "Creating Waybar config and style..."
+# ---- START MODIFICATION: Update on-click actions for waybar modules ----
 cat <<EOF > ~/.config/waybar/config.jsonc
 {
     "layer": "top",
@@ -447,17 +489,19 @@ cat <<EOF > ~/.config/waybar/config.jsonc
     ${waybar_battery_config}
     "cpu": {
         "format": " {usage}%",
-        "tooltip": true
+        "tooltip": true,
+        "on-click": "plasma-systemmonitor"
     },
     "memory": {
-        "format": " {}%"
+        "format": " {}%",
+        "on-click": "plasma-systemmonitor"
     },
     "network": {
         "format-wifi": "  {essid}",
         "format-ethernet": "󰈀 {ifname}",
         "format-disconnected": "⚠ Disconnected",
         "tooltip-format": "{ifname} via {gwaddr} ",
-        "on-click": "nm-connection-editor"
+        "on-click": "kcmshell5 kcm_networkmanagement"
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",
@@ -465,7 +509,7 @@ cat <<EOF > ~/.config/waybar/config.jsonc
         "format-icons": {
             "default": ["", ""]
         },
-        "on-click": "pavucontrol"
+        "on-click": "kcmshell5 kcm_audiovolume"
     },
     "tray": {
         "icon-size": 18,
@@ -473,7 +517,9 @@ cat <<EOF > ~/.config/waybar/config.jsonc
     }
 }
 EOF
+# ---- END MODIFICATION ----
 
+# ---- START MODIFICATION: Use Catppuccin Mocha colors for Waybar ----
 cat <<EOF > ~/.config/waybar/style.css
 * {
     border: none;
@@ -484,37 +530,39 @@ cat <<EOF > ~/.config/waybar/style.css
 }
 
 window#waybar {
-    background-color: rgba(40, 42, 54, 0.8);
-    color: #f8f8f2;
+    background-color: rgba(30, 30, 46, 0.85); /* Catppuccin Base color with transparency */
+    color: #cdd6f4; /* Catppuccin Text color */
     border: 2px solid $ACCENT_COLOR;
     border-radius: 15px;
 }
 
 #workspaces button.active {
     background: $ACCENT_COLOR;
-    color: #282a36;
+    color: #1e1e2e; /* Catppuccin Base color for contrast */
 }
 
 #workspaces button {
     padding: 0 10px;
     background: transparent;
-    color: #f8f8f2;
+    color: #cdd6f4;
     border-radius: 10px;
 }
 
 #workspaces button:hover {
-    background: #44475a;
+    background: #45475a; /* Catppuccin Surface1 */
 }
 
 #window, #clock, #cpu, #memory, #pulseaudio, #network, #tray, #battery {
     padding: 0 10px;
     margin: 5px;
-    background-color: #44475a;
+    background-color: #313244; /* Catppuccin Surface0 */
     border-radius: 10px;
 }
 EOF
+# ---- END MODIFICATION ----
 
 # --- Rofi Configuration ---
+# ---- START MODIFICATION: Use Catppuccin Mocha colors for Rofi ----
 echo "Creating Rofi config..."
 cat <<EOF > ~/.config/rofi/config.rasi
 configuration {
@@ -526,9 +574,10 @@ configuration {
 @theme "/dev/null"
 
 * {
-    bg: #282a36;
-    bg-alt: #44475a;
-    fg: #f8f8f2;
+    /* Catppuccin Mocha */
+    bg: #1e1e2e;
+    bg-alt: #313244;
+    fg: #cdd6f4;
     accent: $ACCENT_COLOR;
 
     background-color: transparent;
@@ -536,7 +585,7 @@ configuration {
 }
 
 window {
-    background-color: rgba(40, 42, 54, 0.9);
+    background-color: rgba(30, 30, 46, 0.9); /* bg with transparency */
     border: 2px;
     border-color: @accent;
     border-radius: 15px;
@@ -581,6 +630,7 @@ element.selected.normal {
     text-color: @bg;
 }
 EOF
+# ---- END MODIFICATION ----
 
 # --- wlogout Configuration ---
 echo "Creating wlogout config..."
@@ -595,18 +645,19 @@ cat <<EOF > ~/.config/wlogout/layout.json
 }
 EOF
 
+# ---- START MODIFICATION: Use Catppuccin Mocha colors for wlogout ----
 cat <<EOF > ~/.config/wlogout/style.css
 window {
-    background-color: rgba(40, 42, 54, 0.9);
+    background-color: rgba(30, 30, 46, 0.9); /* Catppuccin Base with transparency */
     font-family: Noto Sans;
     font-size: 16pt;
-    color: #f8f8f2;
+    color: #cdd6f4; /* Catppuccin Text */
 }
 
 button {
-    background-color: #44475a;
-    color: #f8f8f2;
-    border: 2px solid #282a36;
+    background-color: #313244; /* Catppuccin Surface0 */
+    color: #cdd6f4;
+    border: 2px solid #1e1e2e; /* Catppuccin Base */
     border-radius: 15px;
     background-repeat: no-repeat;
     background-position: center;
@@ -615,7 +666,7 @@ button {
 
 button:focus, button:active, button:hover {
     background-color: $ACCENT_COLOR;
-    color: #282a36;
+    color: #1e1e2e;
     border: 2px solid $ACCENT_COLOR;
     outline-style: none;
 }
@@ -625,42 +676,57 @@ button:focus, button:active, button:hover {
 #reboot { background-image: image(url("/usr/share/wlogout/icons/reboot.png")); }
 #shutdown { background-image: image(url("/usr/share/wlogout/icons/shutdown.png")); }
 EOF
+# ---- END MODIFICATION ----
+
 
 # --- Theming Setup ---
+# ---- START MODIFICATION: Complete rewrite of theming section for consistency ----
 echo "Applying GTK and QT themes..."
+GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
+KVANTUM_THEME="Catppuccin-Mocha-${CATT_ACCENT}"
+ICON_THEME="Papirus-Dark"
+CURSOR_THEME="Catppuccin-Mocha-Dark"
+FONT="Noto Sans 11"
+
+# GTK3 settings
 cat <<EOF > ~/.config/gtk-3.0/settings.ini
 [Settings]
-gtk-theme-name=Adwaita-dark
-gtk-icon-theme-name=breeze-dark
-gtk-cursor-theme-name=breeze_cursors
-gtk-font-name=Noto Sans 11
+gtk-theme-name=$GTK_THEME
+gtk-icon-theme-name=$ICON_THEME
+gtk-cursor-theme-name=$CURSOR_THEME
+gtk-font-name=$FONT
 EOF
-gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
-gsettings set org.gnome.desktop.interface icon-theme 'breeze-dark'
-gsettings set org.gnome.desktop.interface cursor-theme 'breeze_cursors'
-gsettings set org.gnome.desktop.interface font-name 'Noto Sans 11'
 
+# Create symlink for GTK4 to use GTK3 settings
+ln -sf ~/.config/gtk-3.0/settings.ini ~/.config/gtk-4.0/settings.ini
+
+# QT5/6 settings
 cat <<EOF > ~/.config/qt5ct/qt5ct.conf
 [Appearance]
-icon_theme=breeze-dark
+icon_theme=$ICON_THEME
 style=kvantum
+
 [Fonts]
 general=@Noto Sans,11,-1,5,50,0,0,0,0,0
 EOF
 ln -sf ~/.config/qt5ct/qt5ct.conf ~/.config/qt6ct/qt6ct.conf
+
+# Kvantum settings
 cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
-theme=KvAdaptaDark
+theme=$KVANTUM_THEME
 EOF
+# ---- END MODIFICATION ----
+
 
 # --- Autostart Configuration ---
 read -p "Do you want to enable automatic login and startup of Hyprland (bypassing a login manager)? (y/N): " autostart_confirm
 if [[ "$autostart_confirm" == [yY] ]]; then
-    
+
     ### Create the single, all-in-one systemd service for autostart ###
     echo "Creating final systemd service for direct autostart..."
     AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
-    
+
     cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
 [Unit]
 Description=Directly starts Hyprland for user %i
@@ -684,13 +750,13 @@ EOF
 
     ### Enable the new service and remove all traces of the old methods ###
     echo "Disabling conflicting services and enabling the new direct autostart service..."
-    
+
     # Disable the standard TTY login to prevent conflicts
     sudo systemctl disable getty@tty1.service
-    
+
     # Enable the new, single service
     sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
-    
+
     # Remove any old, problematic commands from .bash_profile, just in case.
     sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
 
@@ -710,4 +776,3 @@ echo "The system has been configured to use 'seatd' for device management."
 echo "A FULL REBOOT IS REQUIRED for all changes to take effect."
 echo
 echo "Please run 'sudo reboot' now."
-echo
