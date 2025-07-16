@@ -653,7 +653,7 @@ read -p "Do you want to enable automatic login and startup of Hyprland (bypassin
 if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
-    # FIX: 1. Create a proper systemd user service for Hyprland.
+    # 1. Create a systemd user service for Hyprland.
     echo "Creating systemd user service for Hyprland..."
     mkdir -p ~/.config/systemd/user
 
@@ -665,7 +665,7 @@ PartOf=graphical-session.target
 After=graphical-session-pre.target
 
 [Service]
-ExecStart=/usr/bin/Hyprland
+ExecStart=/bin/bash -c "dbus-update-activation-environment --systemd --all && exec Hyprland"
 Restart=always
 RestartSec=1
 
@@ -676,7 +676,7 @@ EOF
     systemctl --user daemon-reload
     systemctl --user enable hyprland.service
 
-    # FIX: 2. Configure systemd for TTY autologin (this part is standard).
+    # 2. Configure systemd for TTY autologin.
     echo "Configuring systemd for automatic login on TTY1..."
     echo "This requires sudo privileges to write a system file."
     SERVICE_DIR="/etc/systemd/system/getty@tty1.service.d"
@@ -688,7 +688,7 @@ ExecStart=-/sbin/agetty --autologin $CURRENT_USER --noclear %I \$TERM
 EOF
     echo "Systemd autologin configured."
 
-    # FIX: 3. Configure shell profile to trigger the systemd graphical session.
+    # 3. Configure shell profile to trigger the systemd graphical session.
     echo "Configuring shell profile to launch the graphical session..."
     PROFILE_FILE="$HOME/.bash_profile"
     LAUNCH_CMD="
