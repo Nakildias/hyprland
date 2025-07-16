@@ -628,61 +628,52 @@ read -p "Do you want to enable automatic login and startup of Hyprland (bypassin
 if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
-    ### Step 1: Create the systemd USER service for Hyprland ###
-    # This service runs as the user and knows how to start Hyprland.
-    echo "Creating systemd USER service for Hyprland..."
-    mkdir -p ~/.config/systemd/user
-    cat <<EOF > ~/.config/systemd/user/hyprland-session.service
-[Unit]
-Description=Hyprland Wayland Compositor
-BindsTo=graphical-session.target
-
-[Service]
-ExecStart=/bin/bash -c "exec Hyprland"
-Restart=always
-RestartSec=1
-
-[Install]
-WantedBy=graphical-session.target
-EOF
-    systemctl --user daemon-reload
-    systemctl --user enable hyprland-session.service
-
-
-    ### Step 2: Create the systemd SYSTEM service to trigger the session ###
-    # This service runs as root, but its only job is to tell the correct
-    # user's systemd instance to start the graphical session.
-    echo "Creating systemd SYSTEM service for autostart..."
+    ### Create the single, all-in-one systemd service for autostart ###
+    # This new service starts Hyprland directly and wraps it in a proper PAM
+    # login session, which provides all the necessary environment, permissions,
+    # and logind integration. This eliminates all intermediate steps.
+    echo "Creating final systemd service for direct autostart..."
     AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
     
     cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
 [Unit]
-Description=Autostarts Hyprland for user %i
-After=systemd-user-sessions.service
+Description=Directly starts Hyprland for user %i
+After=systemd-user-sessions.service plymouth-quit.service
 
 [Service]
 User=%i
-# The systemctl command needs BOTH the runtime directory AND the D-Bus address to connect to the user's session.
-Environment=XDG_RUNTIME_DIR=/run/user/%U
-**Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus**
-ExecStart=/usr/bin/systemctl --user --wait start graphical-session.target
+WorkingDirectory=/home/%i
+# This is the magic bullet. It creates a full login session,
+# providing Hyprland with graphics, input, and environment.
+PAMName=login
+ExecStart=/usr/bin/Hyprland
 StandardOutput=journal
+StandardError=journal
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    ### Step 3: Disable the conflicting TTY1 login and enable the new service ###
-    echo "Disabling standard TTY login and enabling new autostart service..."
-    sudo systemctl disable getty@tty1.service
-    sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
+    ### Enable the new service and remove all traces of the old methods ###
+    echo "Disabling conflicting services and enabling the new direct autostart service..."
     
-    echo "Autostart configured with the new, direct systemd method."
-    # We no longer touch ~/.bash_profile at all.
-    # We find any old junk and remove it.
-    sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
-fi
+    # Disable the standard TTY login to prevent conflicts
+    sudo systemctl disable getty@tty1.service
+    
+    # Enable the new, single service
+    sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
 
+    # Remove the now-unused user service file, if it exists
+    rm -f "$HOME/.config/systemd/user/hyprland-session.service"
+    
+    # Remove any old, problematic commands from .bash_profile, just in case.
+    sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
+
+    echo
+    echo "Autostart configured with the final, direct PAM-based systemd method."
+    echo "This is the most reliable approach."
+fi
 
 # --- Final Instructions ---
 echo
