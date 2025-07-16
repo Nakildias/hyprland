@@ -58,9 +58,9 @@ if ask_yes_no "Do you want to proceed with the installation?"; then
     packages=(
         hyprland waybar rofi kitty thunar btop grim slurp
         qt5-wayland qt6-wayland polkit-kde-agent pipewire wireplumber
-        xdg-desktop-portal-hyprland ttf-jetbrains-mono-nerd noto-fonts-emoji
+        xdg-desktop-portal-hyprland xdg-desktop-portal-gtk ttf-jetbrains-mono-nerd noto-fonts-emoji
         pavucontrol brightnessctl playerctl gvfs tumbler ffmpegthumbnailer
-        imagemagick gnome-calculator steam discord kvantum
+        imagemagick gnome-calculator steam discord kvantum qt5ct qt6ct nwg-look kconfig
     )
 
     for pkg in "${packages[@]}"; do
@@ -90,7 +90,7 @@ fi
 
 # --- Configuration Directories ---
 echo "Creating configuration directories..."
-mkdir -p ~/.config/{hypr,waybar,rofi,kitty,gtk-3.0,qt5ct,qt6ct,Kvantum,environment.d}
+mkdir -p ~/.config/{hypr,waybar,rofi,kitty,gtk-3.0,qt5ct,qt6ct,Kvantum}
 
 # --- 1. Accent Color Selection ---
 print_header "1. Choose Your Accent Color"
@@ -193,17 +193,6 @@ fi
 # --- Configuration File Generation ---
 print_header "Generating Configuration Files"
 
-# --- Systemd Environment File for Theming (Most Reliable Method) ---
-echo "Creating systemd environment file for robust theming..."
-cat > ~/.config/environment.d/01-theme.conf <<EOF
-# This file sets environment variables for theming GTK and Qt apps
-# It is the most reliable way to ensure themes are applied correctly
-GDK_THEME=Dracula
-QT_QPA_PLATFORMTHEME=qt5ct
-QT_STYLE_OVERRIDE=kvantum
-EOF
-
-
 # --- Hyprland Config (~/.config/hypr/hyprland.conf) ---
 echo "Generating hyprland.conf..."
 cat > ~/.config/hypr/hyprland.conf <<EOF
@@ -217,14 +206,19 @@ cat > ~/.config/hypr/hyprland.conf <<EOF
 # See https://wiki.hyprland.org/Configuring/Monitors/
 $MONITOR_CONFIG
 
-# Source a file (multi-file configs)
-# source = ~/.config/hypr/myColors.conf
+# --- Environment Variables for Theming ---
+# We set these here as a fallback. The main method is direct application via gsettings/kwriteconfig.
+env = GDK_THEME,Dracula
+env = XCURSOR_THEME,Dracula
+env = QT_QPA_PLATFORMTHEME,qt5ct
+env = QT_STYLE_OVERRIDE,kvantum
 
 # Execute your favorite apps at launch
 exec-once = waybar &
 exec-once = swww init & swww img ~/Pictures/wall.jpg # Set your wallpaper
 exec-once = /usr/lib/polkit-kde-authentication-agent-1
 exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+exec-once = systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
 
 # For all categories, see https://wiki.hyprland.org/Configuring/Variables/
 input {
@@ -687,6 +681,20 @@ cat > ~/.config/Kvantum/kvantum.kvconfig <<EOF
 theme=Dracula
 EOF
 
+# --- Forcefully Apply Themes ---
+print_header "Applying Themes Directly"
+echo "Using gsettings and kwriteconfig to force theme application..."
+
+# GTK Theme
+gsettings set org.gnome.desktop.interface gtk-theme "Dracula"
+gsettings set org.gnome.desktop.interface icon-theme "Dracula"
+gsettings set org.gnome.desktop.interface cursor-theme "Dracula"
+gsettings set org.gnome.desktop.interface font-name "JetBrains Mono Nerd Font 11"
+
+# KDE/Qt Theme
+kwriteconfig5 --file ~/.config/kdeglobals --group General --key Name Dracula
+kwriteconfig5 --file ~/.config/kdeglobals --group General --key widgetStyle Kvantum
+kwriteconfig5 --file ~/.config/kdeglobals --group Icons --key Theme Dracula
 
 # --- Seatd Configuration ---
 print_header "6. Configuring seatd for Autostart"
@@ -706,7 +714,7 @@ print_header "Setup Complete!"
 echo "The Hyprland configuration is complete."
 echo "Here are some important next steps:"
 echo "1. A wallpaper has been linked, but you should place your desired wallpaper at '~/Pictures/wall.jpg' or edit the path in '~/.config/hypr/hyprland.conf'."
-echo "2. A FULL REBOOT is absolutely required for the new theming environment variables to be loaded by the system."
+echo "2. A FULL REBOOT is absolutely required for all changes to take effect, especially the direct theme settings."
 echo "3. After rebooting, you should be able to select Hyprland from your login manager, or if you don't have one, it might start automatically from a TTY if seatd is configured."
-echo "Enjoy your new, and hopefully correctly themed, Hyprland setup!"
+echo "Enjoy your new, correctly themed, Hyprland setup!"
 
