@@ -93,7 +93,7 @@ fi
 
 # 5. Default Applications & Dependencies
 pacman_packages=(
-    hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
+    hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland kvantum swaylock swww archlinux-wallpaper
     git grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
     # Core dependencies for new features (lightweight alternatives)
@@ -245,8 +245,6 @@ mkdir -p ~/.config/rofi
 mkdir -p ~/.config/swaync
 mkdir -p ~/.config/Kvantum
 mkdir -p ~/.config/wlogout
-mkdir -p ~/.config/qt5ct
-mkdir -p ~/.config/qt6ct
 mkdir -p ~/.config/gtk-3.0
 mkdir -p ~/.config/gtk-4.0
 
@@ -266,7 +264,7 @@ exec-once = ~/.config/hypr/autostart.sh
 # --- Environment Variables ---
 env = XCURSOR_SIZE,24
 env = GTK_THEME,Dracula
-env = QT_QPA_PLATFORMTHEME,qt5ct
+env = QT_QPA_PLATFORMTHEME,kde
 env = QT_STYLE_OVERRIDE,kvantum
 env = XDG_CURRENT_DESKTOP,KDE
 
@@ -327,7 +325,7 @@ dwindle {
 master { new_is_master = true }
 
 # --- Window Rules ---
-windowrulev2 = float, class:^(kcalc|${FM_CMD}|qt5ct|qt6ct|nwg-look|wlogout|pavucontrol|nm-connection-editor)$
+windowrulev2 = float, class:^(kcalc|${FM_CMD}|nwg-look|wlogout|pavucontrol|nm-connection-editor)$
 windowrulev2 = float, title:^(Copying|Moving|Deleting|File Operation Progress)$
 windowrulev2 = noblur, class:^(wlogout)$
 
@@ -645,24 +643,13 @@ EOF
 # Create symlink for GTK4 to use GTK3 settings
 ln -sf ~/.config/gtk-3.0/settings.ini ~/.config/gtk-4.0/settings.ini
 
-# QT5/6 settings
-cat <<EOF > ~/.config/qt5ct/qt5ct.conf
-[Appearance]
-icon_theme=$ICON_THEME
-style=kvantum
-
-[Fonts]
-general=@Noto Sans,11,-1,5,50,0,0,0,0,0
-EOF
-ln -sf ~/.config/qt5ct/qt5ct.conf ~/.config/qt6ct/qt6ct.conf
-
 # Kvantum settings
 cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
 theme=$KVANTUM_THEME
 EOF
 
-# --- Create kdeglobals for consistent KDE/Qt App Colors ---
+# Create kdeglobals for consistent KDE/Qt App Colors
 echo "Creating kdeglobals file for consistent Qt application colors..."
 cat <<EOF > ~/.config/kdeglobals
 [General]
@@ -672,6 +659,9 @@ widgetStyle=Kvantum
 
 [Icons]
 Theme=Dracula
+
+[Fonts]
+General=Noto Sans,11,-1,5,50,0,0,0,0,0
 EOF
 
 # --- KDE/Qt Application-Specific Theming ---
