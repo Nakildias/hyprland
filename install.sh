@@ -284,8 +284,7 @@ exec-once = swww init
 # FIX: Wallpaper command is now generated directly here.
 # This uses shell parameter expansion: if WALLPAPER_PATH is set and not empty,
 # it generates the exec-once line. The quoting is more robust.
-${WALLPAPER_PATH:+exec-once = bash -c "sleep 2 && swww img '${WALLPAPER_PATH}' --transition-type any"}
-
+${WALLPAPER_PATH:+exec-once = sleep 1 && swww img "${WALLPAPER_PATH}" --transition-type any}
 # --- Environment Variables ---
 env = XCURSOR_SIZE,24
 env = QT_QPA_PLATFORMTHEME,qt5ct
@@ -654,37 +653,56 @@ read -p "Do you want to enable automatic login and startup of Hyprland (bypassin
 if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
-    # 1. Configure systemd for TTY autologin
+    # FIX: 1. Create a proper systemd user service for Hyprland.
+    echo "Creating systemd user service for Hyprland..."
+    mkdir -p ~/.config/systemd/user
+
+    cat <<EOF > ~/.config/systemd/user/hyprland.service
+[Unit]
+Description=Hyprland Wayland Compositor
+Documentation=https://wiki.hyprland.org/
+PartOf=graphical-session.target
+After=graphical-session-pre.target
+
+[Service]
+ExecStart=/usr/bin/Hyprland
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+
+    systemctl --user daemon-reload
+    systemctl --user enable hyprland.service
+
+    # FIX: 2. Configure systemd for TTY autologin (this part is standard).
     echo "Configuring systemd for automatic login on TTY1..."
     echo "This requires sudo privileges to write a system file."
-
     SERVICE_DIR="/etc/systemd/system/getty@tty1.service.d"
-    SERVICE_FILE="$SERVICE_DIR/override.conf"
-
     sudo mkdir -p "$SERVICE_DIR"
-
-    # This command starts a user session on TTY1
-    SERVICE_CONTENT="[Service]\nExecStart=\nExecStart=-/usr/bin/agetty --autologin $CURRENT_USER --noclear %I \$TERM"
-    echo -e "$SERVICE_CONTENT" | sudo tee "$SERVICE_FILE" > /dev/null
+    cat <<EOF | sudo tee "$SERVICE_DIR/override.conf" > /dev/null
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $CURRENT_USER --noclear %I \$TERM
+EOF
     echo "Systemd autologin configured."
 
-    # 2. FIX: Configure shell profile to launch Hyprland automatically
-    # Autologin just logs you into a TTY. This command, placed in your shell's
-    # profile, is the trigger that actually starts the graphical session.
-    echo "Configuring shell profile to launch Hyprland..."
+    # FIX: 3. Configure shell profile to trigger the systemd graphical session.
+    echo "Configuring shell profile to launch the graphical session..."
     PROFILE_FILE="$HOME/.bash_profile"
     LAUNCH_CMD="
-# Start Hyprland on tty1 if not already in a graphical session
-if [ -z \"\$DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then
-  exec Hyprland
+# Start the graphical session on TTY1
+if [ -z \"\$DISPLAY\" ] && [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then
+  exec systemctl --user --wait start graphical-session.target
 fi"
 
     # Add the command to .bash_profile if it's not already there
-    if ! grep -q "exec Hyprland" "$PROFILE_FILE" 2>/dev/null; then
+    if ! grep -q "graphical-session.target" "$PROFILE_FILE" 2>/dev/null; then
         echo -e "$LAUNCH_CMD" >> "$PROFILE_FILE"
-        echo "Hyprland launch command added to $PROFILE_FILE."
+        echo "Graphical session launch command added to $PROFILE_FILE."
     else
-        echo "Hyprland launch command already exists in $PROFILE_FILE."
+        echo "Graphical session launch command already exists in $PROFILE_FILE."
     fi
 fi
 
