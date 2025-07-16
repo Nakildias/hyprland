@@ -155,7 +155,13 @@ if ! command -v hyprctl &> /dev/null || ! command -v jq &> /dev/null; then
     echo "Warning: hyprctl or jq not found. Using preferred monitor settings."
     num_monitors=0
 else
-    num_monitors=$(hyprctl monitors -j | jq 'length')
+    # Check if Hyprland is running
+    if pgrep -x Hyprland > /dev/null; then
+        num_monitors=$(hyprctl monitors -j | jq 'length')
+    else
+        echo "Hyprland is not running. Cannot detect monitors. Using preferred settings."
+        num_monitors=0
+    fi
 fi
 
 if [ "$num_monitors" -eq 1 ]; then
@@ -206,7 +212,7 @@ $MONITOR_CONFIG
 # Execute your favorite apps at launch
 exec-once = waybar &
 exec-once = swww init & swww img ~/Pictures/wall.jpg # Set your wallpaper
-exec-once = polkit-kde-agent
+exec-once = /usr/lib/polkit-kde-authentication-agent-1
 exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
 
 # For all categories, see https://wiki.hyprland.org/Configuring/Variables/
@@ -519,6 +525,7 @@ EOF
 # --- Rofi Config (~/.config/rofi/config.rasi) ---
 echo "Generating Rofi config..."
 cat > ~/.config/rofi/config.rasi <<EOF
+/* Rofi config with embedded Dracula theme to avoid parsing errors */
 configuration {
     modi: "drun,run";
     show-icons: true;
@@ -526,70 +533,100 @@ configuration {
     drun-display-format: "{name}";
 }
 
-@theme "dracula"
+* {
+    background-color: #282a36;
+    border-color:     #bd93f9;
+    text-color:       #f8f8f2;
+    font:             "JetBrains Mono Nerd Font 12";
+}
 
 window {
+    width: 30%;
+    padding: 20px;
     border: 2px;
-    border-color: @selected-active-background;
-    background-color: @background;
+    border-radius: 10px;
+    border-color: @border-color;
+    background-color: @background-color;
 }
 
 mainbox {
-    border: 2px;
-    border-color: @selected-active-background;
-    background-color: @background;
+    children: [ inputbar, listview ];
+    spacing: 15px;
+    padding: 10px;
 }
 
-element-text, element-icon {
+inputbar {
+    children: [ prompt, entry ];
+    padding: 8px;
+    border-radius: 8px;
+    background-color: #44475a;
+    text-color: #f8f8f2;
+}
+
+prompt {
+    enabled: true;
+    padding: 0 10px 0 5px;
     background-color: inherit;
-    text-color:       inherit;
+    text-color: #50fa7b; /* Green */
+}
+
+entry {
+    background-color: inherit;
+    placeholder: "Search...";
+    placeholder-color: #6272a4; /* Comment */
+}
+
+listview {
+    lines: 8;
+    columns: 1;
+    cycle: true;
+    dynamic: true;
+    layout: vertical;
+}
+
+element {
+    padding: 8px;
+    border-radius: 8px;
+    orientation: horizontal;
+}
+
+element-icon {
+    size: 24px;
+    padding: 0 15px 0 0;
+}
+
+element-text {
+    vertical-align: 0.5;
 }
 
 element.normal.normal {
-    background-color: @normal-background;
-    text-color:       @normal-foreground;
+    background-color: @background-color;
+    text-color: @text-color;
 }
 
 element.normal.urgent {
-    background-color: @urgent-background;
-    text-color:       @urgent-foreground;
+    background-color: #ff5555; /* Red */
+    text-color: @text-color;
 }
 
 element.normal.active {
-    background-color: @active-background;
-    text-color:       @active-foreground;
+    background-color: #ff79c6; /* Pink */
+    text-color: @text-color;
 }
 
 element.selected.normal {
-    background-color: @selected-normal-background;
-    text-color:       @selected-normal-foreground;
-    border:           0px 0px 2px 0px;
-    border-color:     @selected-active-background;
+    background-color: #44475a; /* Comment */
+    text-color: @border-color; /* Purple */
 }
 
 element.selected.urgent {
-    background-color: @selected-urgent-background;
-    text-color:       @selected-urgent-foreground;
+    background-color: #ff5555; /* Red */
+    text-color: @text-color;
 }
 
 element.selected.active {
-    background-color: $ACCENT_COLOR_HEX;
-    text-color:       @background;
-}
-
-element.alternate.normal {
-    background-color: @alternate-normal-background;
-    text-color:       @alternate-normal-foreground;
-}
-
-element.alternate.urgent {
-    background-color: @alternate-urgent-background;
-    text-color:       @alternate-urgent-foreground;
-}
-
-element.alternate.active {
-    background-color: @alternate-active-background;
-    text-color:       @alternate-active-foreground;
+    background-color: $ACCENT_COLOR_HEX; /* User's Accent Color */
+    text-color: #282a36; /* BG Color */
 }
 EOF
 
@@ -610,7 +647,7 @@ font_size 11.0
 background_opacity 0.85
 EOF
 # Download Dracula theme for Kitty
-curl -o ~/.config/kitty/current-theme.conf https://raw.githubusercontent.com/dexpota/kitty-themes/master/themes/Dracula.conf
+curl -s -o ~/.config/kitty/current-theme.conf https://raw.githubusercontent.com/dexpota/kitty-themes/master/themes/Dracula.conf
 
 
 # --- GTK & Qt Theming ---
