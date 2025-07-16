@@ -151,7 +151,13 @@ echo "Waybar will be positioned at the $WAYBAR_POSITION."
 # --- 3. Monitor Configuration ---
 print_header "3. Monitor Configuration"
 MONITOR_CONFIG=""
-num_monitors=$(hyprctl monitors -j | jq 'length')
+if ! command -v hyprctl &> /dev/null || ! command -v jq &> /dev/null; then
+    echo "Warning: hyprctl or jq not found. Using preferred monitor settings."
+    num_monitors=0
+else
+    num_monitors=$(hyprctl monitors -j | jq 'length')
+fi
+
 if [ "$num_monitors" -eq 1 ]; then
     echo "Single monitor detected."
     if ask_yes_no "Do you want to manually set resolution and refresh rate?"; then
@@ -164,7 +170,7 @@ if [ "$num_monitors" -eq 1 ]; then
         echo "Using preferred monitor settings."
     fi
 else
-    echo "Multiple monitors detected. Please configure them manually in hyprland.conf."
+    echo "Multiple monitors detected or monitor info not available. Using preferred settings."
     MONITOR_CONFIG="monitor=,preferred,auto,1"
 fi
 
@@ -518,7 +524,6 @@ configuration {
     show-icons: true;
     font: "JetBrains Mono Nerd Font 12";
     drun-display-format: "{name}";
-    theme: "dracula";
 }
 
 @theme "dracula"
@@ -587,7 +592,6 @@ element.alternate.active {
     text-color:       @alternate-active-foreground;
 }
 EOF
-# Note: Rofi's Dracula theme is built-in, we just tweak it.
 
 # --- Kitty Config (~/.config/kitty/kitty.conf) ---
 echo "Generating Kitty config..."
