@@ -92,7 +92,7 @@ fi
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
-    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq dbus-x11
+    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq
 )
 aur_packages=(wlogout)
 
