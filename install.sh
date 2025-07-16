@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Complete Hyprland Installation Script
-# This version incorporates a unified theming system and improved Waybar integration.
+# This version incorporates the Dracula theming system and lightweight utilities.
 
 # Abort on any error
 set -e
@@ -92,22 +92,21 @@ EBC
 fi
 
 # 5. Default Applications & Dependencies
-# ---- START MODIFICATION: Moved AUR packages to the correct list ----
+# ---- START MODIFICATION: Replaced KDE/Plasma tools and switched to Dracula theme packages ----
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
-    # Core dependencies for new features
-    plasma-systemmonitor networkmanager plasma-nm plasma-pa kio
-    # Theming packages from official repos
-    papirus-icon-theme
+    # Core dependencies for new features (lightweight alternatives)
+    btop networkmanager network-manager-applet pavucontrol kio # kio is a Dolphin dependency
 )
 aur_packages=(
     wlogout
-    # Theming packages from the AUR
-    catppuccin-gtk-theme-mocha
-    catppuccin-cursors-mocha
-    catppuccin-kvantum-git
+    # Dracula Theme packages from the AUR
+    dracula-gtk-theme
+    dracula-kvantum-theme-git
+    dracula-icons-git
+    dracula-cursors-git
 )
 # ---- END MODIFICATION ----
 
@@ -142,43 +141,14 @@ case $fm_choice in
     3) FM_CMD="thunar"; pacman_packages+=("thunar") ;;
 esac
 
-# 6. Accent Color
-accent_options=("Blue (Default Arch)" "Red" "Orange" "Purple" "Yellow" "Green" "Black" "White" "Custom")
-color_map=(
-    ["1"]="#1188aa" # Blue
-    ["2"]="#e06c75" # Red
-    ["3"]="#d19a66" # Orange
-    ["4"]="#c678dd" # Purple
-    ["5"]="#e5c07b" # Yellow
-    ["6"]="#98c379" # Green
-    ["7"]="#282a36" # Black
-    ["8"]="#f8f8f2" # White
-)
-cattpuccin_map=(
-    ["1"]="Blue"
-    ["2"]="Red"
-    ["3"]="Yellow" # User's Orange -> Catppuccin Yellow
-    ["4"]="Mauve"  # User's Purple -> Catppuccin Mauve
-    ["5"]="Yellow"
-    ["6"]="Green"
-    ["7"]="Blue"   # Default for Black
-    ["8"]="Blue"   # Default for White
-)
-
-print_menu "Choose an Accent Color" accent_options
-color_choice=$(get_choice "${accent_options[@]}")
-
-if [ "$color_choice" -eq 9 ]; then
-    read -p "Enter custom hex color (e.g., #1a2b3c): " ACCENT_COLOR
-    while ! [[ "$ACCENT_COLOR" =~ ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$ ]]; do
-        read -p "Invalid format. Please enter a valid hex color: " ACCENT_COLOR
-    done
-    CATT_ACCENT="Blue" # Default to Blue accent for Catppuccin theme on custom color
-else
-    ACCENT_COLOR=${color_map[$color_choice]}
-    CATT_ACCENT=${cattpuccin_map[$color_choice]}
-fi
-HYPR_ACCENT_COLOR=${ACCENT_COLOR#\#}
+# ---- START MODIFICATION: Replaced Accent Color choice with fixed Dracula theme ----
+# --- Theme Configuration (Dracula) ---
+echo
+echo "🎨 Applying the Dracula theme for a flat, modern aesthetic."
+ACCENT_COLOR="#bd93f9" # Dracula Purple
+HYPR_ACCENT_COLOR="bd93f9"
+HYPR_GRADIENT_COLOR="8be9fd" # Dracula Cyan
+# ---- END MODIFICATION ----
 
 # 7. Wallpaper Selection
 WALLPAPER_PATH=""
@@ -222,8 +192,7 @@ echo " Battery Meter: ${battery_confirm:-N}"
 echo " Terminal: ${terminal_options[$((terminal_choice-1))]}"
 echo " IDE: ${ide_options[$((ide_choice-1))]}"
 echo " File Manager: ${fm_options[$((fm_choice-1))]}"
-echo " Accent Color: $ACCENT_COLOR"
-echo " Theme: Catppuccin Mocha with $CATT_ACCENT accent"
+echo " Theme: Dracula"
 echo " Wallpaper: ${WALLPAPER_PATH:-None}"
 echo "------------------------------------------------------"
 echo
@@ -290,23 +259,21 @@ mkdir -p ~/.config/gtk-3.0
 mkdir -p ~/.config/gtk-4.0
 
 # --- Hyprland Configuration ---
-GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
 echo "Creating hyprland.conf..."
 cat <<EOF > ~/.config/hypr/hyprland.conf
 # -----------------------------------------------------
-# Hyprland Config
+# Hyprland Config (Dracula Theme)
 # -----------------------------------------------------
 
 # --- Monitor Configuration ---
 ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 
 # --- Autostart Programs ---
-# We now use a dedicated script for a more robust startup
 exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
 env = XCURSOR_SIZE,24
-env = GTK_THEME,$GTK_THEME
+env = GTK_THEME,Dracula
 env = QT_QPA_PLATFORMTHEME,qt5ct
 env = QT_STYLE_OVERRIDE,kvantum
 env = XDG_CURRENT_DESKTOP,KDE
@@ -324,8 +291,8 @@ general {
     gaps_in = $gaps_in
     gaps_out = $gaps_out
     border_size = 2
-    col.active_border = rgba(${HYPR_ACCENT_COLOR}ee) rgba(0055a4ee) 45deg
-    col.inactive_border = rgba(595959aa)
+    col.active_border = rgba(${HYPR_ACCENT_COLOR}ee) rgba(${HYPR_GRADIENT_COLOR}ee) 45deg
+    col.inactive_border = rgba(44475aaa)
     layout = dwindle
 }
 
@@ -337,7 +304,6 @@ decoration {
         size = 5
         passes = 2
         new_optimizations = on
-        # Make background of windows transparent
         xray = true
         noise = 0.0117
         contrast = 0.8916
@@ -369,7 +335,7 @@ dwindle {
 master { new_is_master = true }
 
 # --- Window Rules ---
-windowrulev2 = float, class:^(kcalc|${FM_CMD}|qt5ct|qt6ct|nwg-look|wlogout|pavucontrol|nm-connection-editor|systemsettings5)$
+windowrulev2 = float, class:^(kcalc|${FM_CMD}|qt5ct|qt6ct|nwg-look|wlogout|pavucontrol|nm-connection-editor)$
 windowrulev2 = float, title:^(Copying|Moving|Deleting|File Operation Progress)$
 windowrulev2 = noblur, class:^(wlogout)$
 
@@ -485,18 +451,18 @@ cat <<EOF > ~/.config/waybar/config.jsonc
     "cpu": {
         "format": " {usage}%",
         "tooltip": true,
-        "on-click": "plasma-systemmonitor"
+        "on-click": "$TERM_CMD -e btop"
     },
     "memory": {
         "format": " {}%",
-        "on-click": "plasma-systemmonitor"
+        "on-click": "$TERM_CMD -e btop"
     },
     "network": {
         "format-wifi": "  {essid}",
         "format-ethernet": "󰈀 {ifname}",
         "format-disconnected": "⚠ Disconnected",
         "tooltip-format": "{ifname} via {gwaddr} ",
-        "on-click": "kcmshell5 kcm_networkmanagement"
+        "on-click": "nm-connection-editor"
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",
@@ -504,7 +470,7 @@ cat <<EOF > ~/.config/waybar/config.jsonc
         "format-icons": {
             "default": ["", ""]
         },
-        "on-click": "kcmshell5 kcm_audiovolume"
+        "on-click": "pavucontrol"
     },
     "tray": {
         "icon-size": 18,
@@ -523,32 +489,32 @@ cat <<EOF > ~/.config/waybar/style.css
 }
 
 window#waybar {
-    background-color: rgba(30, 30, 46, 0.85); /* Catppuccin Base color with transparency */
-    color: #cdd6f4; /* Catppuccin Text color */
+    background-color: rgba(40, 42, 54, 0.85); /* Dracula BG with transparency */
+    color: #f8f8f2; /* Dracula FG */
     border: 2px solid $ACCENT_COLOR;
     border-radius: 15px;
 }
 
 #workspaces button.active {
     background: $ACCENT_COLOR;
-    color: #1e1e2e; /* Catppuccin Base color for contrast */
+    color: #282a36; /* Dracula BG for contrast */
 }
 
 #workspaces button {
     padding: 0 10px;
     background: transparent;
-    color: #cdd6f4;
+    color: #f8f8f2;
     border-radius: 10px;
 }
 
 #workspaces button:hover {
-    background: #45475a; /* Catppuccin Surface1 */
+    background: #44475a; /* Dracula Selection */
 }
 
 #window, #clock, #cpu, #memory, #pulseaudio, #network, #tray, #battery {
     padding: 0 10px;
     margin: 5px;
-    background-color: #313244; /* Catppuccin Surface0 */
+    background-color: #44475a; /* Dracula Selection */
     border-radius: 10px;
 }
 EOF
@@ -565,10 +531,10 @@ configuration {
 @theme "/dev/null"
 
 * {
-    /* Catppuccin Mocha */
-    bg: #1e1e2e;
-    bg-alt: #313244;
-    fg: #cdd6f4;
+    /* Dracula */
+    bg: #282a36;
+    bg-alt: #44475a;
+    fg: #f8f8f2;
     accent: $ACCENT_COLOR;
 
     background-color: transparent;
@@ -576,7 +542,7 @@ configuration {
 }
 
 window {
-    background-color: rgba(30, 30, 46, 0.9); /* bg with transparency */
+    background-color: rgba(40, 42, 54, 0.9); /* bg with transparency */
     border: 2px;
     border-color: @accent;
     border-radius: 15px;
@@ -637,16 +603,16 @@ EOF
 
 cat <<EOF > ~/.config/wlogout/style.css
 window {
-    background-color: rgba(30, 30, 46, 0.9); /* Catppuccin Base with transparency */
+    background-color: rgba(40, 42, 54, 0.9); /* Dracula BG with transparency */
     font-family: Noto Sans;
     font-size: 16pt;
-    color: #cdd6f4; /* Catppuccin Text */
+    color: #f8f8f2; /* Dracula FG */
 }
 
 button {
-    background-color: #313244; /* Catppuccin Surface0 */
-    color: #cdd6f4;
-    border: 2px solid #1e1e2e; /* Catppuccin Base */
+    background-color: #44475a; /* Dracula Selection */
+    color: #f8f8f2;
+    border: 2px solid #282a36; /* Dracula BG */
     border-radius: 15px;
     background-repeat: no-repeat;
     background-position: center;
@@ -655,7 +621,7 @@ button {
 
 button:focus, button:active, button:hover {
     background-color: $ACCENT_COLOR;
-    color: #1e1e2e;
+    color: #282a36;
     border: 2px solid $ACCENT_COLOR;
     outline-style: none;
 }
@@ -669,10 +635,10 @@ EOF
 
 # --- Theming Setup ---
 echo "Applying GTK and QT themes..."
-GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
-KVANTUM_THEME="Catppuccin-Mocha-${CATT_ACCENT}"
-ICON_THEME="Papirus-Dark"
-CURSOR_THEME="Catppuccin-Mocha-Dark"
+GTK_THEME="Dracula"
+KVANTUM_THEME="Dracula"
+ICON_THEME="Dracula"
+CURSOR_THEME="Dracula"
 FONT="Noto Sans 11"
 
 # GTK3 settings
@@ -754,7 +720,7 @@ fi
 # --- Final Instructions ---
 echo
 echo "------------------------------------------------------"
-echo " Installation Complete!"
+echo " ✅ Installation Complete!"
 echo "------------------------------------------------------"
 echo "All configurations have been generated based on your choices."
 echo
