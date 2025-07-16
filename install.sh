@@ -96,10 +96,8 @@ pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland kvantum swaylock swww archlinux-wallpaper
     git grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
-    # Core dependencies for new features (lightweight alternatives)
-    btop networkmanager network-manager-applet pavucontrol kio # kio is a Dolphin dependency
+    btop networkmanager network-manager-applet pavucontrol kio
 )
-# Use the all-in-one theme package provided by the user
 aur_packages=(
     wlogout
     full-dracula-theme-git
@@ -142,7 +140,7 @@ ACCENT_COLOR="#bd93f9" # Dracula Purple
 HYPR_ACCENT_COLOR="bd93f9"
 HYPR_GRADIENT_COLOR="8be9fd" # Dracula Cyan
 
-# 7. Wallpaper Selection
+# --- Wallpaper Selection ---
 WALLPAPER_PATH=""
 wallpaper_dir_user="$HOME/Pictures/wallpapers"
 wallpaper_dir_system="/usr/share/backgrounds"
@@ -192,23 +190,6 @@ read -p "Do you want to proceed with the installation? (y/N): " final_confirm
 if [[ "$final_confirm" != [yY] ]]; then
     echo "Installation aborted."
     exit 0
-fi
-
-# --- User Input for Monitor Configuration ---
-MONITOR_CONFIG=""
-read -p "Do you have a single monitor? (y/N): " single_monitor
-if [[ "$single_monitor" == [yY] ]]; then
-    echo "Please provide your monitor's resolution and refresh rate."
-    read -p "Resolution (e.g., 1920x1080): " resolution
-    read -p "Refresh Rate (e.g., 144): " refresh_rate
-    if [[ -n "$resolution" && -n "$refresh_rate" ]]; then
-        MONITOR_CONFIG="monitor=,${resolution}@${refresh_rate},auto,1"
-    else
-        echo "Invalid input. Using default monitor settings."
-    fi
-else
-    echo "Multi-monitor setup detected. You will need to configure monitors manually in ~/.config/hypr/hyprland.conf"
-    echo "A placeholder configuration will be created."
 fi
 
 # --- AUR Helper (yay) Installation ---
@@ -262,10 +243,11 @@ ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
-# Simplified for a more reliable Qt theme experience
 env = XCURSOR_SIZE,24
 env = GTK_THEME,Dracula
+env = QT_QPA_PLATFORMTHEME,kde
 env = QT_STYLE_OVERRIDE,kvantum
+env = XDG_CURRENT_DESKTOP,KDE
 
 # --- Input Devices ---
 input {
@@ -288,16 +270,7 @@ general {
 # --- Decoration ---
 decoration {
     rounding = 10
-    blur {
-        enabled = true
-        size = 5
-        passes = 2
-        new_optimizations = on
-        xray = true
-        noise = 0.0117
-        contrast = 0.8916
-        brightness = 0.8172
-    }
+    blur { enabled = true, size = 5, passes = 2, new_optimizations = on, xray = true, noise = 0.0117, contrast = 0.8916, brightness = 0.8172 }
     drop_shadow = yes
     shadow_range = 4
     shadow_render_power = 3
@@ -317,10 +290,7 @@ animations {
 }
 
 # --- Layouts ---
-dwindle {
-    pseudotile = yes
-    preserve_split = yes
-}
+dwindle { pseudotile = yes, preserve_split = yes }
 master { new_is_master = true }
 
 # --- Window Rules ---
@@ -330,31 +300,21 @@ windowrulev2 = noblur, class:^(wlogout)$
 
 # --- Keybindings ---
 \$mainMod = SUPER
-
-# Application Launchers
 bind = \$mainMod, RETURN, exec, $TERM_CMD
 bind = \$mainMod, E, exec, $FM_CMD
 bind = \$mainMod, D, exec, rofi -show drun
 bind = \$mainMod, T, exec, $IDE_CMD
 bind = \$mainMod, C, exec, kcalc
-
-# Window Management
 bind = \$mainMod, Q, killactive,
 bind = \$mainMod, M, exec, wlogout
 bind = \$mainMod, F, fullscreen,
 bind = \$mainMod, SPACE, togglefloating,
 bind = \$mainMod, P, pseudo,
-
-# Waybar Toggle
 bind = \$mainMod, W, exec, pkill -SIGUSR1 waybar || waybar
-
-# Focus
 bind = \$mainMod, left, movefocus, l
 bind = \$mainMod, right, movefocus, r
 bind = \$mainMod, up, movefocus, u
 bind = \$mainMod, down, movefocus, d
-
-# Workspaces
 bind = \$mainMod, 1, workspace, 1
 bind = \$mainMod, 2, workspace, 2
 bind = \$mainMod, 3, workspace, 3
@@ -365,8 +325,6 @@ bind = \$mainMod, 7, workspace, 7
 bind = \$mainMod, 8, workspace, 8
 bind = \$mainMod, 9, workspace, 9
 bind = \$mainMod, 0, workspace, 10
-
-# Move window to workspace
 bind = \$mainMod SHIFT, 1, movetoworkspace, 1
 bind = \$mainMod SHIFT, 2, movetoworkspace, 2
 bind = \$mainMod SHIFT, 3, movetoworkspace, 3
@@ -377,16 +335,10 @@ bind = \$mainMod SHIFT, 7, movetoworkspace, 7
 bind = \$mainMod SHIFT, 8, movetoworkspace, 8
 bind = \$mainMod SHIFT, 9, movetoworkspace, 9
 bind = \$mainMod SHIFT, 0, movetoworkspace, 10
-
-# Scroll through existing workspaces
 bind = \$mainMod, mouse_down, workspace, e+1
 bind = \$mainMod, mouse_up, workspace, e-1
-
-# Move/resize windows with mouse
 bindm = \$mainMod, mouse:272, movewindow
 bindm = \$mainMod, mouse:273, resizewindow
-
-# Screenshots
 bind = , Print, exec, grim -g "\$(slurp)" - | swappy -f -
 bind = \$mainMod, Print, exec, grim -g "\$(hyprctl activewindow -j | jq -r '"\\(.at[0]),\\(.at[1]) \\(.size[0])x\\(.size[1])"') " - | swappy -f -
 EOF
@@ -395,21 +347,13 @@ EOF
 echo "Creating autostart.sh..."
 cat <<EOF > ~/.config/hypr/autostart.sh
 #!/bin/bash
-
-# A small delay to ensure services are ready
 sleep 1
-
-# Start key daemons in the background
 /usr/lib/polkit-kde-authentication-agent-1 &
 waybar &
 swaync &
 swww init &
-
-# Set wallpaper after a short delay
 (sleep 2 && ${WALLPAPER_PATH:+swww img "${WALLPAPER_PATH}" --transition-type any}) &
 EOF
-
-# Make the script executable
 chmod +x ~/.config/hypr/autostart.sh
 
 # --- Waybar Configuration ---
@@ -638,8 +582,6 @@ gtk-icon-theme-name=$ICON_THEME
 gtk-cursor-theme-name=$CURSOR_THEME
 gtk-font-name=$FONT
 EOF
-
-# Create symlink for GTK4 to use GTK3 settings
 ln -sf ~/.config/gtk-3.0/settings.ini ~/.config/gtk-4.0/settings.ini
 
 # Kvantum settings
@@ -648,9 +590,9 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 theme=$KVANTUM_THEME
 EOF
 
-# Create kdeglobals for consistent KDE/Qt App Colors
-echo "Creating kdeglobals file for consistent Qt application colors..."
-cat <<EOF > ~/.config/kdeglobals
+# --- Create Comprehensive kdeglobals for Full Color Theming ---
+echo "Creating comprehensive kdeglobals file to force correct Qt colors..."
+cat <<'EOF' > ~/.config/kdeglobals
 [General]
 ColorScheme=Dracula
 Name=Dracula
@@ -661,6 +603,42 @@ Theme=Dracula
 
 [Fonts]
 General=Noto Sans,11,-1,5,50,0,0,0,0,0
+
+[Colors:Window]
+ActiveBackground=80,250,123
+ActiveForeground=40,42,54
+BackgroundAlternate=40,42,54
+BackgroundNormal=40,42,54
+DecorationFocus=80,250,123
+DecorationHover=80,250,123
+ForegroundActive=255,121,198
+ForegroundInactive=98,114,164
+ForegroundLink=139,233,253
+ForegroundNegative=255,85,85
+ForegroundNeutral=241,250,140
+ForegroundNormal=248,248,242
+ForegroundPositive=80,250,123
+ForegroundVisited=189,147,249
+
+[Colors:View]
+BackgroundNormal=40,42,54
+ForegroundNormal=248,248,242
+BackgroundAlternate=40,42,54
+BackgroundActive=68,71,90
+ForegroundActive=248,248,242
+ForegroundInactive=98,114,164
+ForegroundLink=139,233,253
+ForegroundVisited=189,147,249
+
+[Colors:Button]
+BackgroundNormal=68,71,90
+ForegroundNormal=248,248,242
+
+[WM]
+activeBackground=80,250,123
+activeForeground=40,42,54
+inactiveBackground=68,71,90
+inactiveForeground=98,114,164
 EOF
 
 # --- KDE/Qt Application-Specific Theming ---
@@ -671,7 +649,6 @@ mkdir -p ~/.local/share/konsole/
 mkdir -p ~/.local/share/org.kde.syntax-highlighting/themes/
 
 # 1. Konsole Theming (Terminal Area)
-# Create the Dracula color scheme file
 cat <<'EOF' > ~/.local/share/konsole/Dracula.colorscheme
 [Color]
 Name=Dracula
@@ -715,7 +692,6 @@ Color=191,191,191
 Color=255,255,255
 EOF
 
-# Create a Konsole profile that uses the Dracula color scheme
 cat <<'EOF' > ~/.local/share/konsole/Dracula.profile
 [Appearance]
 ColorScheme=Dracula
@@ -724,19 +700,16 @@ Name=Dracula
 Parent=FALLBACK/
 EOF
 
-# Set Dracula as the default profile in a minimal konsolerc
 cat <<EOF > ~/.config/konsolerc
 [Desktop Entry]
 DefaultProfile=Dracula.profile
 EOF
 
 # 2. Kate Theming (Editor Area)
-# Create the Dracula syntax highlighting theme file (minified JSON)
 cat <<'EOF' > ~/.local/share/org.kde.syntax-highlighting/themes/Dracula.theme
 {"metadata":{"name":"Dracula","revision":1},"text-styles":{"Normal":{"text-color":"#f8f8f2"},"Keyword":{"text-color":"#ff79c6","bold":true},"Function":{"text-color":"#50fa7b"},"Variable":{"text-color":"#8be9fd","italic":true},"ControlFlow":{"text-color":"#ff79c6","bold":true},"Operator":{"text-color":"#ff79c6"},"BuiltIn":{"text-color":"#8be9fd","italic":true},"Extension":{},"Preprocessor":{"text-color":"#50fa7b"},"Attribute":{"text-color":"#50fa7b"},"Char":{"text-color":"#f1fa8c"},"SpecialChar":{"text-color":"#f1fa8c"},"String":{"text-color":"#f1fa8c"},"VerbatimString":{"text-color":"#f1fa8c"},"SpecialString":{"text-color":"#f1fa8c"},"Import":{},"DataType":{"text-color":"#8be9fd","italic":true},"Decimal":{"text-color":"#bd93f9"},"BaseN":{"text-color":"#bd93f9"},"Float":{"text-color":"#bd93f9"},"Constant":{"text-color":"#8be9fd","italic":true},"Comment":{"text-color":"#6272a4"},"Documentation":{"text-color":"#6272a4"},"Annotation":{"text-color":"#f1fa8c"},"CommentVar":{"text-color":"#8be9fd","italic":true},"RegionMarker":{"text-color":"#f1fa8c"},"Information":{"text-color":"#6272a4"},"Warning":{"text-color":"#f1fa8c"},"Alert":{"text-color":"#ffb86c","background-color":"#6272a4","bold":true},"Error":{"text-color":"#ff5555","underline":true},"Others":{}},"editor-colors":{"BackgroundColor":"#282a36","CodeFolding":"#6272a4","BracketMatching":"#6272a4","CurrentLine":"#44475a","IconBorder":"#44475a","IndentationLine":"#44475a","LineNumbers":"#6272a4","MarkBookmark":"#ff79c6","MarkError":"#ff5555","MarkWarning":"#f1fa8c","ModifiedLines":"#ffb86c","ReplaceHighlight":"#ffb86c","SavedLines":"#50fa7b","SearchHighlight":"#ffb86c","Separator":"#44475a","SpellChecking":"#ff5555","TabMarker":"#44475a","TemplateBackground":"#44475a","TemplatePlaceholder":"#bd93f9","TemplateFocusedPlaceholder":"#ff79c6","WordWrapMarker":"#44475a"}}
 EOF
 
-# Set Dracula as the default scheme in a minimal katerc
 cat <<EOF > ~/.config/katerc
 [General]
 Color Theme=Dracula
