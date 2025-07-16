@@ -28,7 +28,7 @@ function get_choice() {
 
 # --- Introduction ---
 echo "------------------------------------------------------"
-echo " Hyprland Arch Linux Installation Script by Gemini"
+echo " Hyprland Arch Linux Installation Script"
 echo "------------------------------------------------------"
 echo
 echo "This script will guide you through installing and configuring a personalized Hyprland desktop."
@@ -52,23 +52,15 @@ esac
 waybar_position="top"
 waybar_pos_options=("Top (Default)" "Bottom")
 print_menu "Select Waybar Position" waybar_pos_options
-# FIX: Store the choice in a variable for the summary screen.
 waybar_pos_choice=$(get_choice "${waybar_pos_options[@]}")
 if [ "$waybar_pos_choice" -eq 2 ]; then
     waybar_position="bottom"
-    # FIX: The 'layer' must always be 'top' for Waybar to draw *over* windows.
-    # Setting it to 'bottom' hides it behind application windows. 'position' controls
-    # whether it's at the top or bottom of the screen.
-    # The 'waybar_layer="bottom"' line has been removed.
 fi
 
 # 3. Waybar Clock Format
-# FIX: Removed single quotes from format strings. They would be written into the
-# JSON file, making it invalid. Use double quotes for the assignment.
 clock_format=" {:%H:%M  %d/%m}"
 clock_options=("Time and Date (Default)" "Time Only")
 print_menu "Select Waybar Clock Format" clock_options
-# FIX: Store the choice in a variable for the summary screen.
 clock_choice=$(get_choice "${clock_options[@]}")
 if [ "$clock_choice" -eq 2 ]; then
     clock_format=" {:%H:%M}"
@@ -160,16 +152,13 @@ fi
 HYPR_ACCENT_COLOR=${ACCENT_COLOR#\#}
 
 # 7. Wallpaper Selection
-# FIX: The WALLPAPER_EXEC variable has been removed for a more direct implementation.
 WALLPAPER_PATH=""
 wallpaper_dir_user="$HOME/Pictures/wallpapers"
 wallpaper_dir_system="/usr/share/backgrounds"
 wallpaper_options=()
 
-# Create user wallpaper directory if it doesn't exist
 mkdir -p "$wallpaper_dir_user"
 
-# Find wallpapers in user and system directories
 if [ -d "$wallpaper_dir_user" ]; then
     while IFS= read -r -d $'\0' file; do
         wallpaper_options+=("$file")
@@ -243,14 +232,10 @@ else
     echo "'yay' is already installed."
 fi
 
-
 # --- Package Installation ---
 echo "Updating system and installing necessary packages..."
-# Install official packages
 sudo pacman -Syu --needed --noconfirm "${pacman_packages[@]}"
-# Install AUR packages
 yay -S --needed --noconfirm "${aur_packages[@]}"
-
 
 # --- Configuration Directory Creation ---
 echo "Creating configuration directories..."
@@ -260,31 +245,27 @@ mkdir -p ~/.config/rofi
 mkdir -p ~/.config/swaync
 mkdir -p ~/.config/Kvantum
 mkdir -p ~/.config/wlogout
-mkdir -p ~/.config/qt5ct    # <-- Add this line
-mkdir -p ~/.config/qt6ct    # <-- Add this line
-mkdir -p ~/.config/gtk-3.0  # <-- Also adding this from later in the script for consistency
-# systemd directory creation is handled in its own section now
+mkdir -p ~/.config/qt5ct
+mkdir -p ~/.config/qt6ct
+mkdir -p ~/.config/gtk-3.0
 
 # --- Hyprland Configuration ---
 echo "Creating hyprland.conf..."
 cat <<EOF > ~/.config/hypr/hyprland.conf
 # -----------------------------------------------------
-# Hyprland Config by Gemini
+# Hyprland Config
 # -----------------------------------------------------
 
 # --- Monitor Configuration ---
 ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 
-# --- Autostart Programs (Optimized for Speed) ---
-exec-once = systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+# --- Autostart Programs ---
 exec-once = /usr/lib/polkit-kde-authentication-agent-1
 exec-once = waybar
 exec-once = swaync
 exec-once = swww init
-# FIX: Wallpaper command is now generated directly here.
-# This uses shell parameter expansion: if WALLPAPER_PATH is set and not empty,
-# it generates the exec-once line. The quoting is more robust.
 ${WALLPAPER_PATH:+exec-once = sleep 1 && swww img "${WALLPAPER_PATH}" --transition-type any}
+
 # --- Environment Variables ---
 env = XCURSOR_SIZE,24
 env = QT_QPA_PLATFORMTHEME,qt5ct
@@ -573,7 +554,6 @@ EOF
 
 # --- wlogout Configuration ---
 echo "Creating wlogout config..."
-mkdir -p ~/.config/wlogout
 cat <<EOF > ~/.config/wlogout/layout.json
 {
     "buttons": [
@@ -616,11 +596,8 @@ button:focus, button:active, button:hover {
 #shutdown { background-image: image(url("/usr/share/wlogout/icons/shutdown.png")); }
 EOF
 
-
 # --- Theming Setup ---
 echo "Applying GTK and QT themes..."
-# Create necessary directories for settings
-mkdir -p ~/.config/gtk-3.0
 cat <<EOF > ~/.config/gtk-3.0/settings.ini
 [Settings]
 gtk-theme-name=Adwaita-dark
@@ -628,8 +605,6 @@ gtk-icon-theme-name=breeze-dark
 gtk-cursor-theme-name=breeze_cursors
 gtk-font-name=Noto Sans 11
 EOF
-
-# Set GSettings for applications that use it
 gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
 gsettings set org.gnome.desktop.interface icon-theme 'breeze-dark'
 gsettings set org.gnome.desktop.interface cursor-theme 'breeze_cursors'
@@ -648,75 +623,69 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 theme=KvAdaptaDark
 EOF
 
-# --- Systemd Autostart Configuration ---
+# --- Autostart Configuration ---
 read -p "Do you want to enable automatic login and startup of Hyprland (bypassing a login manager)? (y/N): " autostart_confirm
 if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
-    # 1. Create a systemd user service for Hyprland.
-    echo "Creating systemd user service for Hyprland..."
+    ### Step 1: Create the systemd USER service for Hyprland ###
+    echo "Creating systemd USER service for Hyprland..."
     mkdir -p ~/.config/systemd/user
-
-    cat <<EOF > ~/.config/systemd/user/hyprland.service
+    cat <<EOF > ~/.config/systemd/user/hyprland-session.service
 [Unit]
 Description=Hyprland Wayland Compositor
-Documentation=https://wiki.hyprland.org/
-PartOf=graphical-session.target
-After=graphical-session-pre.target
+BindsTo=graphical-session.target
 
 [Service]
-ExecStart=/bin/bash -c "sleep 1 && dbus-update-activation-environment --systemd --all && exec Hyprland"
+ExecStart=/bin/bash -c "exec Hyprland"
 Restart=always
 RestartSec=1
 
 [Install]
 WantedBy=graphical-session.target
 EOF
-
     systemctl --user daemon-reload
-    systemctl --user enable hyprland.service
+    systemctl --user enable hyprland-session.service
 
-    # 2. Configure systemd for TTY autologin.
-    echo "Configuring systemd for automatic login on TTY1..."
-    echo "This requires sudo privileges to write a system file."
-    SERVICE_DIR="/etc/systemd/system/getty@tty1.service.d"
-    sudo mkdir -p "$SERVICE_DIR"
-    cat <<EOF | sudo tee "$SERVICE_DIR/override.conf" > /dev/null
+
+    ### Step 2: Create the systemd SYSTEM service to trigger the session ###
+    echo "Creating systemd SYSTEM service for autostart..."
+    AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
+    
+    cat <<EOF | sudo tee $AUTOLOGIN_SERVICE_FILE > /dev/null
+[Unit]
+Description=Autostarts Hyprland for user %i
+After=systemd-user-sessions.service
+
 [Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $CURRENT_USER --noclear %I \$TERM
+User=%i
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+ExecStart=/usr/bin/systemctl --user --wait start graphical-session.target
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
 EOF
-    echo "Systemd autologin configured."
 
-    # 3. Configure shell profile to trigger the systemd graphical session.
-    echo "Configuring shell profile to launch the graphical session..."
-    PROFILE_FILE="$HOME/.bash_profile"
-    # FIX: Use the more reliable '$XDG_VTNR' variable instead of the 'tty' command.
-    LAUNCH_CMD="
-# Start the graphical session on TTY1
-if [ -z \"\$DISPLAY\" ] && [ -z \"\$WAYLAND_DISPLAY\" ] && [ \"\$XDG_VTNR\" -eq 1 ]; then
-  exec systemctl --user --wait start graphical-session.target
-fi"
-
-    # Add the command to .bash_profile if it's not already there
-    # To ensure the new version is applied, we first remove the old command
-    sed -i "/graphical-session.target/d" "$PROFILE_FILE" 2>/dev/null
-    echo -e "$LAUNCH_CMD" >> "$PROFILE_FILE"
-    echo "Graphical session launch command updated in $PROFILE_FILE."
+    ### Step 3: Disable the conflicting TTY1 login and enable the new service ###
+    echo "Disabling standard TTY login and enabling new autostart service..."
+    sudo systemctl disable getty@tty1.service
+    sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
+    
+    echo "Autostart configured with the new, direct systemd method."
+    # Remove any old, problematic commands from .bash_profile, just in case.
+    sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
 fi
 
 
 # --- Final Instructions ---
 echo
 echo "------------------------------------------------------"
-echo " Installation Complete! 🎉"
+echo " Installation Complete!"
 echo "------------------------------------------------------"
-echo " All configurations have been generated based on your choices."
+echo "All configurations have been generated based on your choices."
 echo
-echo "What's next?"
-echo "1. Reboot your system with 'sudo reboot'."
-echo "2. If you enabled autostart, Hyprland should launch automatically."
-echo "   If not, select 'Hyprland' at your login screen."
-echo "3. Enjoy your new personalized desktop!"
+echo "The autostart method has been replaced with a more reliable, direct systemd service."
+echo "Please reboot now to apply all changes and start your new Hyprland desktop."
 echo
 echo "NOTE: If you have a multi-monitor setup, please edit ~/.config/hypr/hyprland.conf to match your display configuration."
