@@ -92,7 +92,7 @@ fi
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
-    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq
+    xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq dbus-x11
 )
 aur_packages=(wlogout)
 
@@ -260,11 +260,8 @@ cat <<EOF > ~/.config/hypr/hyprland.conf
 ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 
 # --- Autostart Programs ---
-exec-once = /usr/lib/polkit-kde-authentication-agent-1
-exec-once = waybar
-exec-once = swaync
-exec-once = swww init
-${WALLPAPER_PATH:+exec-once = sleep 1 && swww img "${WALLPAPER_PATH}" --transition-type any}
+# We now use a dedicated script for a more robust startup
+exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
 env = XCURSOR_SIZE,24
@@ -622,6 +619,27 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
 theme=KvAdaptaDark
 EOF
+
+# --- Autostart Script Creation ---
+echo "Creating autostart.sh..."
+cat <<EOF > ~/.config/hypr/autostart.sh
+#!/bin/bash
+
+# A small delay to ensure services are ready
+sleep 1
+
+# Start key daemons in the background
+/usr/lib/polkit-kde-authentication-agent-1 &
+waybar &
+swaync &
+swww init &
+
+# Set wallpaper after a short delay
+(sleep 2 && ${WALLPAPER_PATH:+swww img "${WALLPAPER_PATH}" --transition-type any}) &
+EOF
+
+# Make the script executable
+chmod +x ~/.config/hypr/autostart.sh
 
 # --- Autostart Configuration ---
 read -p "Do you want to enable automatic login and startup of Hyprland (bypassing a login manager)? (y/N): " autostart_confirm
