@@ -92,19 +92,21 @@ EBC
 fi
 
 # 5. Default Applications & Dependencies
-# ---- START MODIFICATION: Added packages for theming and functionality ----
+# ---- START MODIFICATION: Moved AUR packages to the correct list ----
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
     xdg-desktop-portal-hyprland polkit-kde-agent nwg-look jq seatd
     # Core dependencies for new features
     plasma-systemmonitor networkmanager plasma-nm plasma-pa kio
-    # Theming packages
-    catppuccin-gtk-theme-mocha papirus-icon-theme catppuccin-cursors-mocha
+    # Theming packages from official repos
+    papirus-icon-theme
 )
 aur_packages=(
     wlogout
-    # Kvantum theme for Catppuccin
+    # Theming packages from the AUR
+    catppuccin-gtk-theme-mocha
+    catppuccin-cursors-mocha
     catppuccin-kvantum-git
 )
 # ---- END MODIFICATION ----
@@ -152,7 +154,6 @@ color_map=(
     ["7"]="#282a36" # Black
     ["8"]="#f8f8f2" # White
 )
-# ---- START MODIFICATION: Map choices to Catppuccin accent names ----
 cattpuccin_map=(
     ["1"]="Blue"
     ["2"]="Red"
@@ -163,7 +164,6 @@ cattpuccin_map=(
     ["7"]="Blue"   # Default for Black
     ["8"]="Blue"   # Default for White
 )
-# ---- END MODIFICATION ----
 
 print_menu "Choose an Accent Color" accent_options
 color_choice=$(get_choice "${accent_options[@]}")
@@ -290,9 +290,7 @@ mkdir -p ~/.config/gtk-3.0
 mkdir -p ~/.config/gtk-4.0
 
 # --- Hyprland Configuration ---
-# ---- START MODIFICATION: Define theme variables for hyprland.conf ----
 GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
-# ---- END MODIFICATION ----
 echo "Creating hyprland.conf..."
 cat <<EOF > ~/.config/hypr/hyprland.conf
 # -----------------------------------------------------
@@ -307,13 +305,11 @@ ${MONITOR_CONFIG:-monitor=,preferred,auto,1}
 exec-once = ~/.config/hypr/autostart.sh
 
 # --- Environment Variables ---
-# ---- START MODIFICATION: Set environment for unified theming ----
 env = XCURSOR_SIZE,24
 env = GTK_THEME,$GTK_THEME
 env = QT_QPA_PLATFORMTHEME,qt5ct
 env = QT_STYLE_OVERRIDE,kvantum
 env = XDG_CURRENT_DESKTOP,KDE
-# ---- END MODIFICATION ----
 
 # --- Input Devices ---
 input {
@@ -463,7 +459,6 @@ chmod +x ~/.config/hypr/autostart.sh
 
 # --- Waybar Configuration ---
 echo "Creating Waybar config and style..."
-# ---- START MODIFICATION: Update on-click actions for waybar modules ----
 cat <<EOF > ~/.config/waybar/config.jsonc
 {
     "layer": "top",
@@ -517,9 +512,7 @@ cat <<EOF > ~/.config/waybar/config.jsonc
     }
 }
 EOF
-# ---- END MODIFICATION ----
 
-# ---- START MODIFICATION: Use Catppuccin Mocha colors for Waybar ----
 cat <<EOF > ~/.config/waybar/style.css
 * {
     border: none;
@@ -559,10 +552,8 @@ window#waybar {
     border-radius: 10px;
 }
 EOF
-# ---- END MODIFICATION ----
 
 # --- Rofi Configuration ---
-# ---- START MODIFICATION: Use Catppuccin Mocha colors for Rofi ----
 echo "Creating Rofi config..."
 cat <<EOF > ~/.config/rofi/config.rasi
 configuration {
@@ -630,7 +621,6 @@ element.selected.normal {
     text-color: @bg;
 }
 EOF
-# ---- END MODIFICATION ----
 
 # --- wlogout Configuration ---
 echo "Creating wlogout config..."
@@ -645,7 +635,6 @@ cat <<EOF > ~/.config/wlogout/layout.json
 }
 EOF
 
-# ---- START MODIFICATION: Use Catppuccin Mocha colors for wlogout ----
 cat <<EOF > ~/.config/wlogout/style.css
 window {
     background-color: rgba(30, 30, 46, 0.9); /* Catppuccin Base with transparency */
@@ -676,11 +665,9 @@ button:focus, button:active, button:hover {
 #reboot { background-image: image(url("/usr/share/wlogout/icons/reboot.png")); }
 #shutdown { background-image: image(url("/usr/share/wlogout/icons/shutdown.png")); }
 EOF
-# ---- END MODIFICATION ----
 
 
 # --- Theming Setup ---
-# ---- START MODIFICATION: Complete rewrite of theming section for consistency ----
 echo "Applying GTK and QT themes..."
 GTK_THEME="Catppuccin-Mocha-Standard-${CATT_ACCENT}-Dark"
 KVANTUM_THEME="Catppuccin-Mocha-${CATT_ACCENT}"
@@ -716,7 +703,6 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
 theme=$KVANTUM_THEME
 EOF
-# ---- END MODIFICATION ----
 
 
 # --- Autostart Configuration ---
