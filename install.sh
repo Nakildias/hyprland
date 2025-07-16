@@ -45,7 +45,13 @@ if ask_yes_no "Do you want to proceed with the installation?"; then
     print_header "Installing Required Packages"
     echo "Updating system and installing packages. This may take a while..."
 
-    # Update package database
+    # --- Enable Multilib for Steam ---
+    echo "Enabling Multilib repository for 32-bit support (required for Steam)..."
+    sudo sed -i "/\[multilib\]/,/Include/"'s/^#//' /etc/pacman.conf
+    echo "Multilib enabled."
+
+    # Update package database after enabling multilib
+    echo "Synchronizing package databases..."
     sudo pacman -Syu --noconfirm
 
     # Essential packages for Hyprland
