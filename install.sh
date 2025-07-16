@@ -90,7 +90,7 @@ fi
 
 # --- Configuration Directories ---
 echo "Creating configuration directories..."
-mkdir -p ~/.config/{hypr,waybar,rofi,kitty,gtk-3.0,qt5ct,qt6ct}
+mkdir -p ~/.config/{hypr,waybar,rofi,kitty,gtk-3.0,qt5ct,qt6ct,Kvantum,environment.d}
 
 # --- 1. Accent Color Selection ---
 print_header "1. Choose Your Accent Color"
@@ -192,6 +192,17 @@ fi
 
 # --- Configuration File Generation ---
 print_header "Generating Configuration Files"
+
+# --- Systemd Environment File for Theming (Most Reliable Method) ---
+echo "Creating systemd environment file for robust theming..."
+cat > ~/.config/environment.d/01-theme.conf <<EOF
+# This file sets environment variables for theming GTK and Qt apps
+# It is the most reliable way to ensure themes are applied correctly
+GDK_THEME=Dracula
+QT_QPA_PLATFORMTHEME=qt5ct
+QT_STYLE_OVERRIDE=kvantum
+EOF
+
 
 # --- Hyprland Config (~/.config/hypr/hyprland.conf) ---
 echo "Generating hyprland.conf..."
@@ -383,11 +394,6 @@ bind=, XF86AudioMute, exec, pactl set-sink-mute @DEFAULT_SINK@ toggle
 bind=, XF86AudioPlay, exec, playerctl play-pause
 bind=, XF86AudioNext, exec, playerctl next
 bind=, XF86AudioPrev, exec, playerctl previous
-
-# --- Environment Variables for Theming ---
-env = GDK_THEME,Dracula
-env = QT_QPA_PLATFORMTHEME,qt5ct
-env = QT_STYLE_OVERRIDE,kvantum
 EOF
 
 # --- Waybar Config (~/.config/waybar/config) ---
@@ -675,6 +681,13 @@ theme=Dracula
 EOF
 ln -sf ~/.config/qt5ct/qt5ct.conf ~/.config/qt6ct/qt6ct.conf
 
+# Kvantum
+cat > ~/.config/Kvantum/kvantum.kvconfig <<EOF
+[General]
+theme=Dracula
+EOF
+
+
 # --- Seatd Configuration ---
 print_header "6. Configuring seatd for Autostart"
 if ask_yes_no "Do you want to enable 'seatd' service for autostarting Hyprland?"; then
@@ -693,7 +706,7 @@ print_header "Setup Complete!"
 echo "The Hyprland configuration is complete."
 echo "Here are some important next steps:"
 echo "1. A wallpaper has been linked, but you should place your desired wallpaper at '~/Pictures/wall.jpg' or edit the path in '~/.config/hypr/hyprland.conf'."
-echo "2. REBOOT your system for all changes, especially for 'seatd' and the new environment variables, to take effect."
+echo "2. A FULL REBOOT is absolutely required for the new theming environment variables to be loaded by the system."
 echo "3. After rebooting, you should be able to select Hyprland from your login manager, or if you don't have one, it might start automatically from a TTY if seatd is configured."
-echo "Enjoy your new Hyprland setup!"
+echo "Enjoy your new, and hopefully correctly themed, Hyprland setup!"
 
