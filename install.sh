@@ -265,7 +265,7 @@ exec-once = ~/.config/hypr/autostart.sh
 env = XCURSOR_SIZE,24
 env = GTK_THEME,Dracula
 env = QT_QPA_PLATFORMTHEME,kde
-env = QT_STYLE_OVERRIDE,kvantum
+# QT_STYLE_OVERRIDE is removed to prevent conflicts with the KDE platform theme
 env = XDG_CURRENT_DESKTOP,KDE
 
 # --- Input Devices ---
