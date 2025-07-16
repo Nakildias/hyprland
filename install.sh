@@ -60,7 +60,7 @@ if ask_yes_no "Do you want to proceed with the installation?"; then
         qt5-wayland qt6-wayland polkit-kde-agent pipewire wireplumber
         xdg-desktop-portal-hyprland ttf-jetbrains-mono-nerd noto-fonts-emoji
         pavucontrol brightnessctl playerctl gvfs tumbler ffmpegthumbnailer
-        imagemagick gnome-calculator steam discord
+        imagemagick gnome-calculator steam discord kvantum
     )
 
     for pkg in "${packages[@]}"; do
@@ -387,6 +387,7 @@ bind=, XF86AudioPrev, exec, playerctl previous
 # --- Environment Variables for Theming ---
 env = GDK_THEME,Dracula
 env = QT_QPA_PLATFORMTHEME,qt5ct
+env = QT_STYLE_OVERRIDE,kvantum
 EOF
 
 # --- Waybar Config (~/.config/waybar/config) ---
@@ -692,7 +693,7 @@ print_header "Setup Complete!"
 echo "The Hyprland configuration is complete."
 echo "Here are some important next steps:"
 echo "1. A wallpaper has been linked, but you should place your desired wallpaper at '~/Pictures/wall.jpg' or edit the path in '~/.config/hypr/hyprland.conf'."
-echo "2. REBOOT your system for all changes, especially for 'seatd', to take effect."
+echo "2. REBOOT your system for all changes, especially for 'seatd' and the new environment variables, to take effect."
 echo "3. After rebooting, you should be able to select Hyprland from your login manager, or if you don't have one, it might start automatically from a TTY if seatd is configured."
 echo "Enjoy your new Hyprland setup!"
 
