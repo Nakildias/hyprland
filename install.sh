@@ -628,9 +628,9 @@ EOF
 # --- Theming Setup ---
 echo "Applying GTK and QT themes..."
 GTK_THEME="Dracula"
-KVANTUM_THEME="Dracula" # This name should be provided by the new package
-ICON_THEME="Dracula"    # This name should be provided by the new package
-CURSOR_THEME="Dracula"  # This name should be provided by the new package
+KVANTUM_THEME="Dracula"
+ICON_THEME="Dracula"
+CURSOR_THEME="Dracula"
 FONT="Noto Sans 11"
 
 # GTK3 settings
@@ -660,6 +660,18 @@ ln -sf ~/.config/qt5ct/qt5ct.conf ~/.config/qt6ct/qt6ct.conf
 cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
 theme=$KVANTUM_THEME
+EOF
+
+# --- Create kdeglobals for consistent KDE/Qt App Colors ---
+echo "Creating kdeglobals file for consistent Qt application colors..."
+cat <<EOF > ~/.config/kdeglobals
+[General]
+ColorScheme=Dracula
+Name=Dracula
+widgetStyle=Kvantum
+
+[Icons]
+Theme=Dracula
 EOF
 
 # --- KDE/Qt Application-Specific Theming ---
