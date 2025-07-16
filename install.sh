@@ -103,7 +103,7 @@ aur_packages=(
     wlogout
     # Dracula Theme packages from the AUR
     dracula-gtk-theme
-    dracula-kvantum-theme-git
+    kvantum-theme-dracula-git # <-- CORRECTED PACKAGE NAME
     dracula-icons-git
     dracula-cursors-git
 )
