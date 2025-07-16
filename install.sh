@@ -92,7 +92,6 @@ EBC
 fi
 
 # 5. Default Applications & Dependencies
-# ---- START MODIFICATION: Replaced KDE/Plasma tools and switched to Dracula theme packages ----
 pacman_packages=(
     hyprland waybar rofi-wayland swaync qt5-wayland qt6-wayland qt5ct qt6ct kvantum swaylock swww archlinux-wallpaper
     grim slurp swappy wl-clipboard noto-fonts noto-fonts-emoji ttf-font-awesome
@@ -108,8 +107,6 @@ aur_packages=(
     dracula-icons-git
     dracula-cursors-git
 )
-# ---- END MODIFICATION ----
-
 
 # Terminal
 terminal_options=("Konsole" "Alacritty" "Kitty")
@@ -141,14 +138,12 @@ case $fm_choice in
     3) FM_CMD="thunar"; pacman_packages+=("thunar") ;;
 esac
 
-# ---- START MODIFICATION: Replaced Accent Color choice with fixed Dracula theme ----
 # --- Theme Configuration (Dracula) ---
 echo
 echo "🎨 Applying the Dracula theme for a flat, modern aesthetic."
 ACCENT_COLOR="#bd93f9" # Dracula Purple
 HYPR_ACCENT_COLOR="bd93f9"
 HYPR_GRADIENT_COLOR="8be9fd" # Dracula Cyan
-# ---- END MODIFICATION ----
 
 # 7. Wallpaper Selection
 WALLPAPER_PATH=""
@@ -669,6 +664,86 @@ cat <<EOF > ~/.config/Kvantum/kvantum.kvconfig
 [General]
 theme=$KVANTUM_THEME
 EOF
+
+# --- START OF NEW SECTION: KDE/Qt Application-Specific Theming ---
+echo "Applying Dracula theme to Konsole and Kate for a cohesive look..."
+
+# Create directories for custom themes and profiles
+mkdir -p ~/.local/share/konsole/
+mkdir -p ~/.local/share/org.kde.syntax-highlighting/themes/
+
+# 1. Konsole Theming (Terminal Area)
+# Create the Dracula color scheme file
+cat <<'EOF' > ~/.local/share/konsole/Dracula.colorscheme
+[Color]
+Name=Dracula
+[General]
+Description=Dracula Theme
+[Background]
+Color=40,42,54
+[Foreground]
+Color=248,248,242
+[Color0]
+Color=0,0,0
+[Color0Intense]
+Color=98,114,164
+[Color1]
+Color=255,85,85
+[Color1Intense]
+Color=255,102,102
+[Color2]
+Color=80,250,123
+[Color2Intense]
+Color=97,255,139
+[Color3]
+Color=241,250,140
+[Color3Intense]
+Color=244,255,157
+[Color4]
+Color=189,147,249
+[Color4Intense]
+Color=198,160,255
+[Color5]
+Color=255,121,198
+[Color5Intense]
+Color=255,138,206
+[Color6]
+Color=139,233,253
+[Color6Intense]
+Color=155,239,255
+[Color7]
+Color=191,191,191
+[Color7Intense]
+Color=255,255,255
+EOF
+
+# Create a Konsole profile that uses the Dracula color scheme
+cat <<'EOF' > ~/.local/share/konsole/Dracula.profile
+[Appearance]
+ColorScheme=Dracula
+[General]
+Name=Dracula
+Parent=FALLBACK/
+EOF
+
+# Set Dracula as the default profile in a minimal konsolerc
+cat <<EOF > ~/.config/konsolerc
+[Desktop Entry]
+DefaultProfile=Dracula.profile
+EOF
+
+# 2. Kate Theming (Editor Area)
+# Create the Dracula syntax highlighting theme file (minified JSON)
+cat <<'EOF' > ~/.local/share/org.kde.syntax-highlighting/themes/Dracula.theme
+{"metadata":{"name":"Dracula","revision":1},"text-styles":{"Normal":{"text-color":"#f8f8f2"},"Keyword":{"text-color":"#ff79c6","bold":true},"Function":{"text-color":"#50fa7b"},"Variable":{"text-color":"#8be9fd","italic":true},"ControlFlow":{"text-color":"#ff79c6","bold":true},"Operator":{"text-color":"#ff79c6"},"BuiltIn":{"text-color":"#8be9fd","italic":true},"Extension":{},"Preprocessor":{"text-color":"#50fa7b"},"Attribute":{"text-color":"#50fa7b"},"Char":{"text-color":"#f1fa8c"},"SpecialChar":{"text-color":"#f1fa8c"},"String":{"text-color":"#f1fa8c"},"VerbatimString":{"text-color":"#f1fa8c"},"SpecialString":{"text-color":"#f1fa8c"},"Import":{},"DataType":{"text-color":"#8be9fd","italic":true},"Decimal":{"text-color":"#bd93f9"},"BaseN":{"text-color":"#bd93f9"},"Float":{"text-color":"#bd93f9"},"Constant":{"text-color":"#8be9fd","italic":true},"Comment":{"text-color":"#6272a4"},"Documentation":{"text-color":"#6272a4"},"Annotation":{"text-color":"#f1fa8c"},"CommentVar":{"text-color":"#8be9fd","italic":true},"RegionMarker":{"text-color":"#f1fa8c"},"Information":{"text-color":"#6272a4"},"Warning":{"text-color":"#f1fa8c"},"Alert":{"text-color":"#ffb86c","background-color":"#6272a4","bold":true},"Error":{"text-color":"#ff5555","underline":true},"Others":{}},"editor-colors":{"BackgroundColor":"#282a36","CodeFolding":"#6272a4","BracketMatching":"#6272a4","CurrentLine":"#44475a","IconBorder":"#44475a","IndentationLine":"#44475a","LineNumbers":"#6272a4","MarkBookmark":"#ff79c6","MarkError":"#ff5555","MarkWarning":"#f1fa8c","ModifiedLines":"#ffb86c","ReplaceHighlight":"#ffb86c","SavedLines":"#50fa7b","SearchHighlight":"#ffb86c","Separator":"#44475a","SpellChecking":"#ff5555","TabMarker":"#44475a","TemplateBackground":"#44475a","TemplatePlaceholder":"#bd93f9","TemplateFocusedPlaceholder":"#ff79c6","WordWrapMarker":"#44475a"}}
+EOF
+
+# Set Dracula as the default scheme in a minimal katerc
+cat <<EOF > ~/.config/katerc
+[General]
+Color Theme=Dracula
+EOF
+# --- END OF NEW SECTION ---
 
 
 # --- Autostart Configuration ---
