@@ -629,6 +629,7 @@ if [[ "$autostart_confirm" == [yY] ]]; then
     CURRENT_USER=$(whoami)
 
     ### Step 1: Create the systemd USER service for Hyprland ###
+    # This service runs as the user and knows how to start Hyprland.
     echo "Creating systemd USER service for Hyprland..."
     mkdir -p ~/.config/systemd/user
     cat <<EOF > ~/.config/systemd/user/hyprland-session.service
@@ -649,6 +650,8 @@ EOF
 
 
     ### Step 2: Create the systemd SYSTEM service to trigger the session ###
+    # This service runs as root, but its only job is to tell the correct
+    # user's systemd instance to start the graphical session.
     echo "Creating systemd SYSTEM service for autostart..."
     AUTOLOGIN_SERVICE_FILE="/etc/systemd/system/hyprland-autologin@.service"
     
@@ -659,7 +662,9 @@ After=systemd-user-sessions.service
 
 [Service]
 User=%i
+# The systemctl command needs BOTH the runtime directory AND the D-Bus address to connect to the user's session.
 Environment=XDG_RUNTIME_DIR=/run/user/%U
+**Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus**
 ExecStart=/usr/bin/systemctl --user --wait start graphical-session.target
 StandardOutput=journal
 
@@ -673,7 +678,8 @@ EOF
     sudo systemctl enable "hyprland-autologin@$CURRENT_USER.service"
     
     echo "Autostart configured with the new, direct systemd method."
-    # Remove any old, problematic commands from .bash_profile, just in case.
+    # We no longer touch ~/.bash_profile at all.
+    # We find any old junk and remove it.
     sed -i "/graphical-session.target/d" "$HOME/.bash_profile" 2>/dev/null || true
 fi
 
