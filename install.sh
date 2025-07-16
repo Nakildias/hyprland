@@ -7,12 +7,12 @@
 #   !!!!!!!!!!!!!!!!!!!!!!!!!!  D A N G E R  !!!!!!!!!!!!!!!!!!!!!!!!!!         #
 #                                                                              #
 #   This script is designed to be EXTREMELY DESTRUCTIVE. It will attempt to    #
-#   remove all major desktop environments and their associated configurations  #
-#   from your Arch Linux system.                                               #
+#   remove all major desktop environments, window managers like Hyprland,      #
+#   and their associated configurations from your Arch Linux system.           #
 #                                                                              #
 #   >>> RUNNING THIS WILL BREAK YOUR GRAPHICAL USER INTERFACE. <<<             #
 #   >>> YOU WILL BE LEFT WITH A COMMAND-LINE ONLY SYSTEM (TTY). <<<            #
-#   >>> THERE IS NO UNDO BUTTON. ALL YOUR DE SETTINGS WILL BE GONE. <<<        #
+#   >>> THERE IS NO UNDO BUTTON. ALL YOUR SETTINGS WILL BE GONE. <<<           #
 #                                                                              #
 #   ** BACK UP YOUR DATA BEFORE PROCEEDING. YOU HAVE BEEN WARNED. ** #
 #                                                                              #
@@ -64,7 +64,7 @@ fi
 
 # --- Define Desktop Environments and their components ---
 
-# Package groups for each DE
+# Package groups for each DE/WM
 declare -A de_packages
 de_packages["GNOME"]="gnome gnome-extra"
 de_packages["KDE Plasma"]="plasma-meta kde-applications-meta"
@@ -73,8 +73,9 @@ de_packages["Cinnamon"]="cinnamon"
 de_packages["MATE"]="mate mate-extra"
 de_packages["LXQt"]="lxqt"
 de_packages["Budgie"]="budgie-desktop"
+de_packages["Hyprland"]="hyprland waybar rofi kitty swww" # Added Hyprland and its ecosystem
 
-# Configuration files and directories for each DE
+# Configuration files and directories for each DE/WM
 declare -A de_configs
 de_configs["GNOME"]="
 ~/.config/dconf
@@ -112,6 +113,13 @@ de_configs["LXQt"]="
 de_configs["Budgie"]="
 ~/.config/budgie-desktop
 "
+de_configs["Hyprland"]="
+~/.config/hypr
+~/.config/waybar
+~/.config/rofi
+~/.config/kitty
+~/.config/swww
+"
 
 
 # --- Removal Process ---
@@ -129,7 +137,7 @@ for de in "${!de_packages[@]}"; do
     # Check if any package from the group is installed
     for pkg_group in ${de_packages[$de]}; do
         if is_installed "$pkg_group"; then
-            echo "Detected $de package group: $pkg_group"
+            echo "Detected $de package or component: $pkg_group"
             detected=true
             break
         fi
